@@ -454,14 +454,14 @@ export const PreviewView: React.FC = () => {
         </div>
       </div>
 
-      {/* Pages Container */}
+      {/* Pages Container for Screen (Hidden during print) */}
       <div
-        className="space-y-8 transition-transform duration-200 origin-top flex flex-col items-center"
+        className="print:hidden space-y-8 transition-transform duration-200 origin-top flex flex-col items-center"
         style={{ transform: zoomLevel !== 100 ? `scale(${zoomLevel / 100})` : undefined }}
       >
         {viewMode === 'single' ? (
           <div className="w-full flex flex-col items-center space-y-2">
-            <div className="print:hidden text-xs font-semibold text-slate-400">
+            <div className="text-xs font-semibold text-slate-400">
               Page {currentPage.pageNumber} of {totalPages} {currentPage.isCoverPage ? '— Cover Page' : ''}
             </div>
             <PaperSheet
@@ -475,7 +475,7 @@ export const PreviewView: React.FC = () => {
         ) : (
           pages.map((p) => (
             <div key={p.pageNumber} className="w-full flex flex-col items-center space-y-2">
-              <div className="print:hidden text-xs font-semibold text-slate-400">
+              <div className="text-xs font-semibold text-slate-400">
                 Page {p.pageNumber} of {totalPages} {p.isCoverPage ? '— Cover Page' : ''}
               </div>
               <PaperSheet
@@ -488,6 +488,20 @@ export const PreviewView: React.FC = () => {
             </div>
           ))
         )}
+      </div>
+
+      {/* Dedicated Clean Print Container: Always prints ALL pages at 100% scale without screen margins/zoom */}
+      <div className="hidden print:block w-full">
+        {pages.map((p) => (
+          <PaperSheet
+            key={`print_page_${p.pageNumber}`}
+            page={p}
+            totalPages={totalPages}
+            settings={paper.settings}
+            layout={paper.layout}
+            questions={(paper.content.sections || []).flatMap(s => s.questions || [])}
+          />
+        ))}
       </div>
 
       {/* Change Template Modal */}

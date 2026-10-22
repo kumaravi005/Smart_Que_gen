@@ -3,6 +3,15 @@ import type { GeneratedPage } from '../../types/pageLayout'
 import type { ExamSettings, VisualLayout, Question } from '../../types'
 import { estimateMcqOptionGrid } from '../../utils/mcqLayout'
 
+/**
+ * Strips duplicate leading question numbers (e.g. "1.", "1)", "1:", "Q1.", "Q.1", "प्रश्न 1.")
+ * to avoid rendering redundant numbering like "Q1. 1. Question"
+ */
+export function cleanQuestionPrompt(prompt: string): string {
+  if (!prompt) return ''
+  return prompt.replace(/^(?:(?:Q|Question|प्रश्न|प्र)\.?\s*\d+[\.\:\-\)]|\d+[\.\:\-\)])\s*/i, '').trim()
+}
+
 interface PaperSheetProps {
   page: GeneratedPage
   totalPages: number
@@ -67,7 +76,7 @@ export const PaperSheet: React.FC<PaperSheetProps> = ({
 
   return (
     <div
-      className={`relative mx-auto bg-white shadow-xl ${borderContainerClass} print:shadow-none print:border-none print:m-0 print:p-0 print:break-after-page rounded-md flex flex-col justify-between transition-all duration-200 select-text`}
+      className={`paper-sheet relative mx-auto bg-white shadow-xl ${borderContainerClass} print:shadow-none print:border-none print:m-0 print:p-0 rounded-md flex flex-col justify-between transition-all duration-200 select-text`}
       style={{
         ...sheetDimensionsStyle,
         paddingTop: isManualMode ? 0 : `${margins.top}mm`,
@@ -473,7 +482,7 @@ export const PaperSheet: React.FC<PaperSheetProps> = ({
 
                             {/* Prompt */}
                             <p className="leading-relaxed break-words font-medium text-slate-900">
-                              {q.prompt}
+                              {cleanQuestionPrompt(q.prompt)}
                             </p>
 
                             {/* Optional Diagram / Image */}
@@ -489,10 +498,10 @@ export const PaperSheet: React.FC<PaperSheetProps> = ({
 
                             {/* Smart MCQ Options */}
                             {q.options && q.options.length > 0 && (
-                              <div className={`pt-1 font-sans text-xs ${mcqGrid.gridClass} gap-1.5`}>
+                              <div className={`pt-1 font-sans text-xs grid ${mcqGrid.gridClass} gap-x-3 gap-y-1`}>
                                 {q.options.map((opt: any) => (
                                   <div key={opt.id} className="flex items-baseline gap-1 break-words">
-                                    <span className="font-bold">({opt.label})</span>
+                                    <span className="font-bold shrink-0">({opt.label})</span>
                                     <span className="break-words">{opt.text}</span>
                                   </div>
                                 ))}

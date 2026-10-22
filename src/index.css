@@ -23,13 +23,18 @@
 /* Print optimizations for paper generation */
 @media print {
   @page {
-    size: auto;
-    margin: 0mm;
+    size: A4 portrait;
+    margin: 0;
   }
 
-  body {
+  html, body {
     background-color: #fff !important;
     color: #000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 210mm !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 
   header, nav, aside, button, .print\:hidden {
@@ -40,10 +45,34 @@
     padding: 0 !important;
     margin: 0 !important;
     max-width: 100% !important;
+    width: 100% !important;
   }
 
   .shadow-xl, .shadow-md, .shadow-xs, .shadow-sm {
     box-shadow: none !important;
+  }
+
+  /* Each A4 sheet is strictly an individual page */
+  .paper-sheet {
+    width: 210mm !important;
+    min-height: 297mm !important;
+    max-height: 297mm !important;
+    page-break-after: always !important;
+    break-after: page !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    overflow: hidden !important;
+    margin: 0 auto !important;
+    border: none !important;
+    box-shadow: none !important;
+    box-sizing: border-box !important;
+    background-color: #fff !important;
+  }
+
+  /* Prevent blank trailing page */
+  .paper-sheet:last-of-type {
+    page-break-after: auto !important;
+    break-after: auto !important;
   }
 
   .print\:break-after-page {
