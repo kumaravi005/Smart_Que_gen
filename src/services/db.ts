@@ -1,5 +1,5 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb'
-import type { PaperMetadata, ExamSettings, PaperContent, VisualLayout, QuestionBankItem } from '../types'
+import type { PaperMetadata, ExamSettings, PaperContent, VisualLayout, QuestionBankItem, PaperSetupTemplate } from '../types'
 import { generateId } from '../utils/id'
 
 export interface OmegaDB extends DBSchema {
@@ -42,6 +42,13 @@ export interface OmegaDB extends DBSchema {
       'by-difficulty': string
     }
   }
+  templates: {
+    key: string
+    value: PaperSetupTemplate
+    indexes: {
+      'by-subject': string
+    }
+  }
   app_settings: {
     key: string
     value: any
@@ -49,7 +56,7 @@ export interface OmegaDB extends DBSchema {
 }
 
 const DB_NAME = 'omega_paper_gen_db'
-const DB_VERSION = 1
+const DB_VERSION = 2
 
 let dbPromise: Promise<IDBPDatabase<OmegaDB>> | null = null
 
@@ -91,7 +98,13 @@ export function getDatabase(): Promise<IDBPDatabase<OmegaDB>> {
           bankStore.createIndex('by-difficulty', 'difficulty')
         }
 
-        // 6. App Settings Store
+        // 6. Templates Store
+        if (!db.objectStoreNames.contains('templates')) {
+          const templateStore = db.createObjectStore('templates', { keyPath: 'id' })
+          templateStore.createIndex('by-subject', 'subject')
+        }
+
+        // 7. App Settings Store
         if (!db.objectStoreNames.contains('app_settings')) {
           db.createObjectStore('app_settings', { keyPath: 'key' })
         }
@@ -151,7 +164,9 @@ export async function seedInitialDataIfEmpty(): Promise<void> {
         title: 'Section A: Multiple Choice Questions (1 Mark Each)',
         totalQuestions: 20,
         marksPerQuestion: 1,
-        targetTypes: ['mcq']
+        targetTypes: ['mcq'],
+        enabled: true,
+        numberingStyle: 'continuous'
       },
       {
         id: 'sec_b',
@@ -159,9 +174,21 @@ export async function seedInitialDataIfEmpty(): Promise<void> {
         title: 'Section B: Short Answer Type I (2 Marks Each)',
         totalQuestions: 5,
         marksPerQuestion: 2,
-        targetTypes: ['short_answer']
+        targetTypes: ['short_answer'],
+        enabled: true,
+        numberingStyle: 'continuous'
       }
     ],
+    studentFields: {
+      showName: true,
+      showRollNo: true,
+      showDate: true,
+      showSection: true,
+      showSignature: true,
+      showInvigilatorSign: true
+    },
+    coverPageMode: 'first_page_top',
+    customCoverText: '',
     createdAt: now,
     updatedAt: now
   }
@@ -240,12 +267,31 @@ export async function seedInitialDataIfEmpty(): Promise<void> {
     watermarkOpacity: 0.08,
     dividerBetweenQuestions: true,
     questionSpacingPt: 10,
+    optionSpacingPt: 6,
+    mcqOptionLayout: 'auto',
+    pageCountStrategy: 'auto',
+    targetPageCount: 2,
     sectionBreakNewPage: false,
     showMarksPerQuestion: true,
     marksAlignment: 'right',
     footerNote: 'Omega Education Center — All Rights Reserved — Best of Luck!',
     showPageNumbers: true,
     pageNumberPosition: 'bottom_center',
+    headerFooter: {
+      logoPlacement: 'center',
+      showInstitutionName: true,
+      showAddress: true,
+      showContact: true,
+      headerCustomText: '',
+      footerCustomText: 'Omega Education Center — All Rights Reserved — Best of Luck!',
+      showPageNumbers: true,
+      pageNumberPosition: 'bottom_center',
+      showExamNameInFooter: true,
+      separatorLineStyle: 'single',
+      borderStyle: 'none',
+      differentFirstPage: false,
+      firstPageHeaderStyle: 'full'
+    },
     createdAt: now,
     updatedAt: now
   }
@@ -267,7 +313,7 @@ export async function seedInitialDataIfEmpty(): Promise<void> {
     tags: ['Class 10', 'Board Prep', 'Term 1']
   }
 
-  // Also seed a couple of question bank items
+  // Sample Question Bank Item
   const sampleBankItem: QuestionBankItem = {
     id: generateId('qb'),
     prompt: 'State the Fundamental Theorem of Arithmetic and explain why 1 is neither prime nor composite.',
@@ -284,9 +330,99 @@ export async function seedInitialDataIfEmpty(): Promise<void> {
     updatedAt: now
   }
 
+  // Sample Reusable Template
+  const sampleTemplate: PaperSetupTemplate = {
+    id: generateId('tpl'),
+    name: 'Standard Coaching Periodic Test (50 Marks)',
+    description: '10 MCQs + 5 Short Answer + 3 Long Answer with balanced single-column layout',
+    subject: 'General Science',
+    className: 'Class X',
+    totalMarks: 50,
+    settings: {
+      institute: sampleSettings.institute,
+      examName: 'Periodic Assessment Test',
+      academicSession: '2026-2027',
+      className: 'Class X',
+      subject: 'Science',
+      durationMinutes: 90,
+      totalMarks: 50,
+      generalInstructions: [
+        'All questions are compulsory.',
+        'Section A comprises 10 MCQs carrying 1 mark each.',
+        'Section B comprises 5 Short Answer questions carrying 4 marks each.',
+        'Section C comprises 2 Long Answer questions carrying 10 marks each.'
+      ],
+      sections: [
+        {
+          id: 'sec_a',
+          name: 'Section A',
+          title: 'Section A: Multiple Choice Questions (1 Mark Each)',
+          totalQuestions: 10,
+          marksPerQuestion: 1,
+          targetTypes: ['mcq'],
+          enabled: true,
+          numberingStyle: 'continuous'
+        },
+        {
+          id: 'sec_b',
+          name: 'Section B',
+          title: 'Section B: Short Answer Questions (4 Marks Each)',
+          totalQuestions: 5,
+          marksPerQuestion: 4,
+          targetTypes: ['short_answer'],
+          enabled: true,
+          numberingStyle: 'continuous'
+        },
+        {
+          id: 'sec_c',
+          name: 'Section C',
+          title: 'Section C: Long Answer / Analytical Questions (10 Marks Each)',
+          totalQuestions: 2,
+          marksPerQuestion: 10,
+          targetTypes: ['long_answer'],
+          enabled: true,
+          numberingStyle: 'continuous'
+        }
+      ],
+      studentFields: sampleSettings.studentFields,
+      coverPageMode: 'first_page_top'
+    },
+    layout: {
+      pageSize: 'A4',
+      orientation: 'portrait',
+      columnLayout: 'single',
+      fontFamily: 'sans',
+      fontSizePt: 11,
+      lineSpacing: 1.25,
+      pageMarginsMm: { top: 15, bottom: 15, left: 15, right: 15 },
+      headerStyle: 'modern',
+      showInstituteLogo: true,
+      logoPlacement: 'center',
+      logoWidthMm: 24,
+      showWatermark: true,
+      watermarkText: 'OMEGA EDUCATION CENTER',
+      watermarkOpacity: 0.08,
+      dividerBetweenQuestions: true,
+      questionSpacingPt: 10,
+      optionSpacingPt: 6,
+      mcqOptionLayout: 'auto',
+      pageCountStrategy: 'auto',
+      targetPageCount: 2,
+      sectionBreakNewPage: false,
+      showMarksPerQuestion: true,
+      marksAlignment: 'right',
+      footerNote: 'Omega Education Center — Academic Excellence',
+      showPageNumbers: true,
+      pageNumberPosition: 'bottom_center',
+      headerFooter: sampleLayout.headerFooter
+    },
+    createdAt: now,
+    updatedAt: now
+  }
+
   // Save to IndexedDB
   const tx = db.transaction(
-    ['papers', 'exam_settings', 'paper_contents', 'visual_layouts', 'question_bank', 'app_settings'],
+    ['papers', 'exam_settings', 'paper_contents', 'visual_layouts', 'question_bank', 'templates', 'app_settings'],
     'readwrite'
   )
   await tx.objectStore('papers').put(sampleMetadata)
@@ -294,6 +430,7 @@ export async function seedInitialDataIfEmpty(): Promise<void> {
   await tx.objectStore('paper_contents').put(sampleContent)
   await tx.objectStore('visual_layouts').put(sampleLayout)
   await tx.objectStore('question_bank').put(sampleBankItem)
+  await tx.objectStore('templates').put(sampleTemplate)
   await tx.objectStore('app_settings').put({
     key: 'institute_profile',
     value: sampleSettings.institute

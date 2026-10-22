@@ -1,5 +1,7 @@
 export type ExamType = 'unit_test' | 'term_exam' | 'final_exam' | 'mock_test' | 'quiz' | 'custom'
 
+export type SectionNumberingStyle = 'continuous' | 'restart_per_section' | 'alpha' | 'roman'
+
 export interface ExamSectionConfig {
   id: string
   name: string
@@ -9,6 +11,10 @@ export interface ExamSectionConfig {
   marksPerQuestion: number
   compulsoryCount?: number // e.g. "Attempt any 5 out of 7"
   targetTypes: string[]
+  numberingStyle?: SectionNumberingStyle
+  enabled?: boolean
+  customTypeName?: string
+  startOnNewPage?: boolean
 }
 
 export interface InstituteProfile {
@@ -19,6 +25,21 @@ export interface InstituteProfile {
   contact?: string
   logoUrl?: string
 }
+
+export interface StudentFieldsConfig {
+  showName: boolean
+  showRollNo: boolean
+  showDate: boolean
+  showSection: boolean
+  showSignature: boolean
+  showInvigilatorSign: boolean
+}
+
+export type CoverPageMode =
+  | 'first_page_top' // Option A: Instructions at the top of the first question page
+  | 'separate_cover' // Option B: A separate cover page containing exam details
+  | 'compact_header' // Option C: A compact header with instructions above the questions
+  | 'custom' // Option D: Custom arrangement
 
 export interface ExamSettings {
   id: string
@@ -34,6 +55,9 @@ export interface ExamSettings {
   date?: string
   generalInstructions: string[]
   sections: ExamSectionConfig[]
+  studentFields: StudentFieldsConfig
+  coverPageMode: CoverPageMode
+  customCoverText?: string
   allowCalculators?: boolean
   customHeaderNote?: string
   createdAt: string

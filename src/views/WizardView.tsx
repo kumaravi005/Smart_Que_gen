@@ -1,375 +1,518 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import {
   Wand2,
-  Save,
+  ArrowLeft,
   ArrowRight,
-  Plus,
-  Trash2,
-  Check
+  CheckCircle2,
+  AlertCircle,
+  Sparkles
 } from 'lucide-react'
 import { usePaperDetails } from '../hooks/usePaperDetails'
 import { usePapers } from '../hooks/usePapers'
+import { paperService } from '../services/paperService'
+import { templateService } from '../services/templateService'
 import { Button } from '../components/common/Button'
-import { Badge } from '../components/common/Badge'
-import type { ExamSectionConfig } from '../types'
-import { generateId } from '../utils/id'
+import { WizardStepper, WIZARD_STEPS } from '../components/wizard/WizardStepper'
+import { Step1ExamDetails } from '../components/wizard/Step1ExamDetails'
+import { Step2QuestionCounts } from '../components/wizard/Step2QuestionCounts'
+import { Step3PageSettings } from '../components/wizard/Step3PageSettings'
+import { Step4Instructions } from '../components/wizard/Step4Instructions'
+import { Step5HeaderFooter } from '../components/wizard/Step5HeaderFooter'
+import { Step6McqLayout } from '../components/wizard/Step6McqLayout'
+import { Step7Review } from '../components/wizard/Step7Review'
+import { validateStep1, validateStep2, validateStep3 } from '../utils/wizardValidation'
+import type { ExamSettings, VisualLayout, PaperSetupTemplate } from '../types'
 
 export const WizardView: React.FC = () => {
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
-  const { papers } = usePapers()
+  const { papers, loading: papersLoading, refresh: refreshPapers } = usePapers()
 
+  // Track active paper ID from URL query or fallback to first paper
   const paperId = searchParams.get('paperId') || (papers.length > 0 ? papers[0].id : '')
-  const { paper, loading, saving, saveSettings } = usePaperDetails(paperId)
+  const stepParam = searchParams.get('step')
+  const initialStep = stepParam ? Math.min(7, Math.max(1, parseInt(stepParam, 10))) : 1
 
-  // Form local state
-  const [examName, setExamName] = useState('')
-  const [subject, setSubject] = useState('')
-  const [className, setClassName] = useState('')
-  const [durationMinutes, setDurationMinutes] = useState(180)
-  const [totalMarks, setTotalMarks] = useState(80)
-  const [instituteName, setInstituteName] = useState('OMEGA EDUCATION CENTER')
-  const [instructions, setInstructions] = useState<string[]>([])
-  const [newInstruction, setNewInstruction] = useState('')
-  const [sections, setSections] = useState<ExamSectionConfig[]>([])
-  const [saveSuccess, setSaveSuccess] = useState(false)
-
+  // Automatically synchronize paperId in URL if paper exists but search param is missing
   useEffect(() => {
-    if (paper?.settings) {
-      setExamName(paper.settings.examName)
-      setSubject(paper.settings.subject)
-      setClassName(paper.settings.className)
-      setDurationMinutes(paper.settings.durationMinutes)
-      setTotalMarks(paper.settings.totalMarks)
-      setInstituteName(paper.settings.institute.name)
-      setInstructions(paper.settings.generalInstructions || [])
-      setSections(paper.settings.sections || [])
+    if (!searchParams.get('paperId') && papers.length > 0) {
+      setSearchParams(prev => {
+        const next = new URLSearchParams(prev)
+        next.set('paperId', papers[0].id)
+        return next
+      }, { replace: true })
+    }
+  }, [papers, searchParams, setSearchParams])
+
+  const [currentStep, setCurrentStep] = useState<number>(initialStep)
+  const [completedSteps, setCompletedSteps] = useState<number[]>([])
+  const [stepErrors, setStepErrors] = useState<Record<string, string>>({})
+  const [stepWarnings, setStepWarnings] = useState<string[]>([])
+  const [isAutoSaving, setIsAutoSaving] = useState(false)
+  const [autoSaveStatus, setAutoSaveStatus] = useState<string>('Saved locally')
+  const [templates, setTemplates] = useState<PaperSetupTemplate[]>([])
+  const [showTemplatesModal, setShowTemplatesModal] = useState(false)
+
+  const { paper, loading, refresh: refreshDetails } = usePaperDetails(paperId)
+
+  // Local editable copies for smooth user input without lag
+  const [localSettings, setLocalSettings] = useState<ExamSettings | null>(null)
+  const [localLayout, setLocalLayout] = useState<VisualLayout | null>(null)
+
+  // Sync with paper details once loaded
+  useEffect(() => {
+    if (paper) {
+      setLocalSettings(paper.settings)
+      setLocalLayout(paper.layout)
     }
   }, [paper])
 
-  const handleAddInstruction = () => {
-    if (!newInstruction.trim()) return
-    setInstructions(prev => [...prev, newInstruction.trim()])
-    setNewInstruction('')
-  }
-
-  const handleRemoveInstruction = (index: number) => {
-    setInstructions(prev => prev.filter((_, i) => i !== index))
-  }
-
-  const handleAddSection = () => {
-    const nextCode = String.fromCharCode(65 + sections.length) // A, B, C, D...
-    const newSec: ExamSectionConfig = {
-      id: generateId('sec'),
-      name: `Section ${nextCode}`,
-      title: `Section ${nextCode}: Descriptive Questions`,
-      totalQuestions: 5,
-      marksPerQuestion: 2,
-      targetTypes: ['short_answer']
+  // Load available templates
+  useEffect(() => {
+    const loadTemplates = async () => {
+      try {
+        const list = await templateService.getAllTemplates()
+        setTemplates(list)
+      } catch (err) {
+        console.error('Failed to load templates:', err)
+      }
     }
-    setSections(prev => [...prev, newSec])
+    loadTemplates()
+  }, [])
+
+  // Auto-save helper to persist progress directly to IndexedDB
+  const persistChanges = useCallback(
+    async (newSettings?: ExamSettings, newLayout?: VisualLayout) => {
+      if (!paper) return
+      try {
+        setIsAutoSaving(true)
+        setAutoSaveStatus('Saving...')
+
+        if (newSettings) {
+          await paperService.updateExamSettings(newSettings)
+        }
+        if (newLayout) {
+          await paperService.updateVisualLayout(newLayout)
+        }
+
+        setAutoSaveStatus('All changes saved to IndexedDB')
+        setTimeout(() => setAutoSaveStatus('Saved locally'), 2000)
+      } catch (err) {
+        console.error('Auto-save error:', err)
+        setAutoSaveStatus('Save error')
+      } finally {
+        setIsAutoSaving(false)
+      }
+    },
+    [paper]
+  )
+
+  // Handler for setting changes
+  const handleSettingsChange = (updates: Partial<ExamSettings>) => {
+    if (!localSettings) return
+    const updated = { ...localSettings, ...updates }
+    setLocalSettings(updated)
+    // Clear errors for touched fields
+    setStepErrors({})
+    persistChanges(updated, undefined)
   }
 
-  const handleRemoveSection = (id: string) => {
-    setSections(prev => prev.filter(s => s.id !== id))
+  // Handler for layout changes
+  const handleLayoutChange = (updates: Partial<VisualLayout>) => {
+    if (!localLayout) return
+    const updated = { ...localLayout, ...updates }
+    setLocalLayout(updated)
+    setStepErrors({})
+    persistChanges(undefined, updated)
   }
 
-  const handleSave = async () => {
+  // Step Validation before advancing
+  const validateCurrentStep = (step: number): boolean => {
+    if (!localSettings || !localLayout) return true
+
+    if (step === 1) {
+      const res = validateStep1(localSettings)
+      setStepErrors(res.errors)
+      setStepWarnings(res.warnings)
+      return res.isValid
+    }
+    if (step === 2) {
+      const res = validateStep2(localSettings)
+      setStepErrors(res.errors)
+      setStepWarnings(res.warnings)
+      return res.isValid
+    }
+    if (step === 3) {
+      const res = validateStep3(localLayout)
+      setStepErrors(res.errors)
+      setStepWarnings(res.warnings)
+      return res.isValid
+    }
+
+    setStepErrors({})
+    setStepWarnings([])
+    return true
+  }
+
+  // Navigation handlers
+  const handleNextStep = async () => {
+    const isValid = validateCurrentStep(currentStep)
+    if (!isValid) return
+
+    if (!completedSteps.includes(currentStep)) {
+      setCompletedSteps(prev => [...prev, currentStep])
+    }
+
+    if (localSettings && localLayout) {
+      await persistChanges(localSettings, localLayout)
+    }
+
+    if (currentStep < 7) {
+      const next = currentStep + 1
+      setCurrentStep(next)
+      setSearchParams({ paperId: paper?.metadata.id || paperId, step: next.toString() })
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    }
+  }
+
+  const handlePrevStep = () => {
+    if (currentStep > 1) {
+      const prev = currentStep - 1
+      setCurrentStep(prev)
+      setSearchParams({ paperId: paper?.metadata.id || paperId, step: prev.toString() })
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    } else {
+      navigate('/')
+    }
+  }
+
+  const handleSelectStep = (targetStep: number) => {
+    // If navigating forward, validate
+    if (targetStep > currentStep) {
+      const isValid = validateCurrentStep(currentStep)
+      if (!isValid) return
+    }
+    setCurrentStep(targetStep)
+    setSearchParams({ paperId: paper?.metadata.id || paperId, step: targetStep.toString() })
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  // Duplicate setup
+  const handleDuplicateSetup = async () => {
     if (!paper) return
-    const updatedSettings = {
-      ...paper.settings,
-      examName,
-      subject,
-      className,
-      durationMinutes: Number(durationMinutes),
-      totalMarks: Number(totalMarks),
-      institute: {
-        ...paper.settings.institute,
-        name: instituteName
-      },
-      generalInstructions: instructions,
-      sections
+    try {
+      const copy = await paperService.duplicatePaper(paper.metadata.id)
+      if (copy) {
+        await refreshPapers()
+        navigate(`/wizard?paperId=${copy.metadata.id}&step=1`)
+        alert(`Setup duplicated successfully as "${copy.metadata.title}".`)
+      }
+    } catch (err) {
+      console.error(err)
+      alert('Failed to duplicate setup.')
     }
-
-    await saveSettings(updatedSettings)
-    setSaveSuccess(true)
-    setTimeout(() => setSaveSuccess(false), 2500)
   }
 
-  if (loading) {
+  // Apply template
+  const handleApplyTemplate = async (template: PaperSetupTemplate) => {
+    if (!paper) return
+    try {
+      await paperService.applyTemplate(paper.metadata.id, template)
+      await refreshDetails()
+      setShowTemplatesModal(false)
+      alert(`Applied template "${template.name}".`)
+    } catch (err) {
+      console.error(err)
+      alert('Failed to apply template.')
+    }
+  }
+
+  // Final confirmation to proceed to question editor
+  const handleConfirmProceed = async () => {
+    if (!paper || !localSettings || !localLayout) return
+    try {
+      // Mark paper as configured
+      const updatedMeta = { ...paper.metadata, status: 'in_progress' as const }
+      await paperService.updateMetadata(updatedMeta)
+      await persistChanges(localSettings, localLayout)
+      navigate(`/editor?paperId=${paper.metadata.id}`)
+    } catch (err) {
+      console.error(err)
+      navigate(`/editor?paperId=${paper.metadata.id}`)
+    }
+  }
+
+  if (papersLoading || (paperId && loading)) {
     return (
-      <div className="p-12 text-center text-slate-500">
-        <div className="inline-block w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mb-3" />
-        <p className="text-sm">Loading exam configuration...</p>
+      <div className="p-16 text-center text-slate-500 space-y-3">
+        <div className="inline-block w-8 h-8 border-3 border-blue-600 border-t-transparent rounded-full animate-spin" />
+        <h3 className="font-bold text-slate-800 text-base">Loading Paper Setup Wizard...</h3>
+        <p className="text-xs text-slate-400">Loading examination preferences from IndexedDB</p>
       </div>
     )
   }
 
   if (!paper) {
     return (
-      <div className="p-8 bg-white rounded-3xl border border-slate-200 text-center space-y-4">
-        <Wand2 className="w-10 h-10 text-slate-400 mx-auto" />
+      <div className="p-10 bg-white rounded-3xl border border-slate-200 text-center space-y-4 max-w-md mx-auto my-12 shadow-sm">
+        <Wand2 className="w-12 h-12 text-blue-600 mx-auto" />
         <h2 className="text-lg font-bold text-slate-800">No Paper Selected</h2>
-        <p className="text-sm text-slate-500 max-w-md mx-auto">
-          Please select an existing paper from the dashboard or create a new paper to start the Setup Wizard.
+        <p className="text-xs text-slate-500">
+          Create a new paper or select one from the dashboard to configure all examination details.
         </p>
-        <Button variant="primary" onClick={() => navigate('/')}>
-          Go to Dashboard
-        </Button>
+        <div className="flex flex-col gap-2 pt-2">
+          <Button
+            variant="primary"
+            onClick={async () => {
+              const created = await paperService.createNewPaper({
+                subject: 'Mathematics',
+                className: 'Class X',
+                examName: 'Mid-Term Examination 2026'
+              })
+              await refreshPapers()
+              setSearchParams({ paperId: created.metadata.id })
+            }}
+          >
+            Create New Paper
+          </Button>
+          <Button variant="ghost" onClick={() => navigate('/')}>
+            Return to Dashboard
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
+  if (!localSettings || !localLayout) {
+    return (
+      <div className="p-16 text-center text-slate-500 space-y-3">
+        <div className="inline-block w-8 h-8 border-3 border-blue-600 border-t-transparent rounded-full animate-spin" />
+        <h3 className="font-bold text-slate-800 text-base">Preparing Wizard Blueprint...</h3>
       </div>
     )
   }
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto">
-      {/* Top Banner */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 sm:p-6 rounded-3xl border border-slate-200/90 shadow-xs">
-        <div className="flex items-center gap-3">
-          <div className="p-3 rounded-2xl bg-blue-50 text-blue-700 border border-blue-100">
-            <Wand2 className="w-6 h-6" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-blue-600 uppercase tracking-wider">Module 1</span>
-              <Badge variant="primary" size="sm">IndexedDB Linked</Badge>
-            </div>
-            <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Paper Setup Wizard</h1>
-            <p className="text-xs text-slate-500">
-              Configure exam parameters and section rules before entering questions.
-            </p>
-          </div>
-        </div>
-
+    <div className="space-y-6 max-w-4xl mx-auto pb-16">
+      {/* Top Breadcrumb & Actions Bar */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-xs">
         <div className="flex items-center gap-2">
           <Button
-            variant="outline"
+            type="button"
+            variant="ghost"
             size="sm"
-            onClick={handleSave}
-            isLoading={saving}
-            leftIcon={saveSuccess ? <Check className="w-4 h-4 text-emerald-600" /> : <Save className="w-4 h-4" />}
+            onClick={handlePrevStep}
+            leftIcon={<ArrowLeft className="w-4 h-4" />}
           >
-            {saveSuccess ? 'Saved!' : 'Save Config'}
+            {currentStep === 1 ? 'Dashboard' : 'Back'}
           </Button>
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={() => navigate(`/editor?paperId=${paper.metadata.id}`)}
-            rightIcon={<ArrowRight className="w-4 h-4" />}
-          >
-            Go to Editor
-          </Button>
-        </div>
-      </div>
-
-      {/* Configuration Form */}
-      <div className="bg-white rounded-3xl border border-slate-200/90 shadow-xs p-5 sm:p-7 space-y-6">
-        <h2 className="text-base font-bold text-slate-900 border-b border-slate-100 pb-3 flex items-center gap-2">
-          <span>1. Institute & Examination Details</span>
-        </h2>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="sm:col-span-2">
-            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
-              Coaching Center / Institute Name
-            </label>
-            <input
-              type="text"
-              value={instituteName}
-              onChange={e => setInstituteName(e.target.value)}
-              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-semibold text-slate-900"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
-              Examination Name
-            </label>
-            <input
-              type="text"
-              value={examName}
-              onChange={e => setExamName(e.target.value)}
-              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
-              Subject
-            </label>
-            <input
-              type="text"
-              value={subject}
-              onChange={e => setSubject(e.target.value)}
-              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
-              Class / Grade
-            </label>
-            <input
-              type="text"
-              value={className}
-              onChange={e => setClassName(e.target.value)}
-              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
-                Time (Mins)
-              </label>
-              <input
-                type="number"
-                value={durationMinutes}
-                onChange={e => setDurationMinutes(Number(e.target.value))}
-                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
-                Max Marks
-              </label>
-              <input
-                type="number"
-                value={totalMarks}
-                onChange={e => setTotalMarks(Number(e.target.value))}
-                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-          </div>
+          <span className="text-slate-300">|</span>
+          <span className="font-semibold text-slate-800 text-sm truncate max-w-[240px] sm:max-w-md">
+            {paper.metadata.title}
+          </span>
         </div>
 
-        {/* Examination Sections Configuration */}
-        <div className="pt-4 border-t border-slate-100">
-          <div className="flex items-center justify-between mb-3">
-            <div>
-              <h2 className="text-base font-bold text-slate-900">2. Paper Section Blueprint</h2>
-              <p className="text-xs text-slate-500">Configure questions count and marks per section</p>
-            </div>
+        <div className="flex items-center gap-2.5 self-end sm:self-center">
+          {/* Auto-Save Indicator */}
+          <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
+            <span className={`w-2 h-2 rounded-full ${isAutoSaving ? 'bg-amber-500 animate-ping' : 'bg-emerald-500'}`} />
+            <span>{autoSaveStatus}</span>
+          </div>
+
+          {templates.length > 0 && (
             <Button
+              type="button"
               variant="outline"
               size="sm"
-              leftIcon={<Plus className="w-4 h-4" />}
-              onClick={handleAddSection}
+              onClick={() => setShowTemplatesModal(true)}
+              leftIcon={<Sparkles className="w-3.5 h-3.5 text-purple-600" />}
             >
-              Add Section
+              Templates ({templates.length})
             </Button>
-          </div>
-
-          <div className="space-y-3">
-            {sections.map(sec => (
-              <div
-                key={sec.id}
-                className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
-              >
-                <div className="flex-1 space-y-2">
-                  <div className="flex items-center gap-2">
-                    <Badge variant="purple" size="sm">{sec.name}</Badge>
-                    <input
-                      type="text"
-                      value={sec.title}
-                      onChange={e => {
-                        const val = e.target.value
-                        setSections(prev =>
-                          prev.map(s => (s.id === sec.id ? { ...s, title: val } : s))
-                        )
-                      }}
-                      className="flex-1 px-2.5 py-1 text-sm bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 font-medium"
-                    />
-                  </div>
-                  <div className="flex items-center gap-4 text-xs text-slate-600">
-                    <label className="flex items-center gap-1.5">
-                      <span>Questions:</span>
-                      <input
-                        type="number"
-                        min="1"
-                        value={sec.totalQuestions}
-                        onChange={e => {
-                          const val = Number(e.target.value)
-                          setSections(prev =>
-                            prev.map(s => (s.id === sec.id ? { ...s, totalQuestions: val } : s))
-                          )
-                        }}
-                        className="w-16 px-2 py-0.5 bg-white border border-slate-200 rounded text-center"
-                      />
-                    </label>
-                    <label className="flex items-center gap-1.5">
-                      <span>Marks each:</span>
-                      <input
-                        type="number"
-                        min="1"
-                        value={sec.marksPerQuestion}
-                        onChange={e => {
-                          const val = Number(e.target.value)
-                          setSections(prev =>
-                            prev.map(s => (s.id === sec.id ? { ...s, marksPerQuestion: val } : s))
-                          )
-                        }}
-                        className="w-16 px-2 py-0.5 bg-white border border-slate-200 rounded text-center"
-                      />
-                    </label>
-                    <span className="font-semibold text-blue-700">
-                      Total: {sec.totalQuestions * sec.marksPerQuestion} M
-                    </span>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => handleRemoveSection(sec.id)}
-                  className="p-2 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-white self-end sm:self-center transition-colors"
-                  title="Remove section"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* General Instructions */}
-        <div className="pt-4 border-t border-slate-100 space-y-3">
-          <h2 className="text-base font-bold text-slate-900">3. General Instructions for Students</h2>
-
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={newInstruction}
-              onChange={e => setNewInstruction(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), handleAddInstruction())}
-              placeholder="e.g. Question 1 to 20 carry 1 mark each..."
-              className="flex-1 px-3.5 py-2 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <Button variant="secondary" size="sm" onClick={handleAddInstruction}>
-              Add
-            </Button>
-          </div>
-
-          <ul className="space-y-2">
-            {instructions.map((inst, index) => (
-              <li
-                key={index}
-                className="flex items-start justify-between gap-2 p-2.5 rounded-xl bg-slate-50 text-xs text-slate-700 border border-slate-200"
-              >
-                <div className="flex items-start gap-2">
-                  <span className="font-bold text-slate-400">{index + 1}.</span>
-                  <span>{inst}</span>
-                </div>
-                <button
-                  onClick={() => handleRemoveInstruction(index)}
-                  className="text-slate-400 hover:text-rose-600 p-1"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
-              </li>
-            ))}
-          </ul>
+          )}
         </div>
       </div>
+
+      {/* Progress Stepper Component */}
+      <WizardStepper
+        currentStep={currentStep}
+        onSelectStep={handleSelectStep}
+        completedSteps={completedSteps}
+      />
+
+      {/* Step Warning Notice (if any) */}
+      {stepWarnings.length > 0 && (
+        <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-xs text-amber-900 space-y-1 animate-in fade-in">
+          {stepWarnings.map((warn, i) => (
+            <div key={i} className="flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+              <span>{warn}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Dynamic Step Views */}
+      <div className="transition-all duration-200">
+        {currentStep === 1 && (
+          <Step1ExamDetails
+            settings={localSettings}
+            onChange={handleSettingsChange}
+            errors={stepErrors}
+          />
+        )}
+
+        {currentStep === 2 && (
+          <Step2QuestionCounts
+            settings={localSettings}
+            actualEnteredQuestionsCount={paper.content.totalCalculatedQuestions}
+            onChange={handleSettingsChange}
+            errors={stepErrors}
+          />
+        )}
+
+        {currentStep === 3 && (
+          <Step3PageSettings
+            settings={localSettings}
+            layout={localLayout}
+            onChange={handleLayoutChange}
+            errors={stepErrors}
+          />
+        )}
+
+        {currentStep === 4 && (
+          <Step4Instructions
+            settings={localSettings}
+            onChange={handleSettingsChange}
+            errors={stepErrors}
+          />
+        )}
+
+        {currentStep === 5 && (
+          <Step5HeaderFooter
+            layout={localLayout}
+            onChange={handleLayoutChange}
+            errors={stepErrors}
+          />
+        )}
+
+        {currentStep === 6 && (
+          <Step6McqLayout
+            layout={localLayout}
+            onChange={handleLayoutChange}
+            errors={stepErrors}
+          />
+        )}
+
+        {currentStep === 7 && (
+          <Step7Review
+            metadata={paper.metadata}
+            settings={localSettings}
+            layout={localLayout}
+            actualQuestionsCount={paper.content.totalCalculatedQuestions}
+            onJumpToStep={handleSelectStep}
+            onConfirmProceed={handleConfirmProceed}
+            onSaveDraft={async () => persistChanges(localSettings, localLayout)}
+            onDuplicate={handleDuplicateSetup}
+            isSaving={isAutoSaving}
+          />
+        )}
+      </div>
+
+      {/* Sticky Bottom Navigation Bar */}
+      <div className="sticky bottom-0 z-20 bg-white/95 backdrop-blur-md border border-slate-200 rounded-3xl p-4 shadow-lg flex items-center justify-between gap-3">
+        <Button
+          type="button"
+          variant="secondary"
+          size="md"
+          onClick={handlePrevStep}
+          leftIcon={<ArrowLeft className="w-4 h-4" />}
+        >
+          {currentStep === 1 ? 'Cancel / Exit' : 'Previous Step'}
+        </Button>
+
+        <div className="hidden sm:flex items-center gap-1.5 text-xs text-slate-500 font-medium">
+          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+          <span>Progress auto-saved in local IndexedDB</span>
+        </div>
+
+        {currentStep < 7 ? (
+          <Button
+            type="button"
+            variant="primary"
+            size="md"
+            onClick={handleNextStep}
+            rightIcon={<ArrowRight className="w-4 h-4" />}
+          >
+            Next: {WIZARD_STEPS[currentStep].shortTitle}
+          </Button>
+        ) : (
+          <Button
+            type="button"
+            variant="primary"
+            size="md"
+            onClick={handleConfirmProceed}
+            rightIcon={<ArrowRight className="w-4 h-4 stroke-[2.5]" />}
+            className="bg-blue-600 hover:bg-blue-700"
+          >
+            Confirm & Go to Question Editor
+          </Button>
+        )}
+      </div>
+
+      {/* Templates Quick-Load Modal */}
+      {showTemplatesModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl border border-slate-200">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div>
+                <h3 className="font-bold text-base text-slate-900">Load Setup Template</h3>
+                <p className="text-xs text-slate-500">Apply predefined blueprint & visual layout parameters</p>
+              </div>
+              <button
+                onClick={() => setShowTemplatesModal(false)}
+                className="text-slate-400 hover:text-slate-700 text-sm font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-2.5 max-h-80 overflow-y-auto">
+              {templates.map(tpl => (
+                <div
+                  key={tpl.id}
+                  className="p-4 rounded-2xl border border-slate-200 hover:border-blue-400 bg-slate-50/50 hover:bg-blue-50/30 transition-all flex items-center justify-between gap-3"
+                >
+                  <div className="space-y-1">
+                    <h4 className="font-bold text-sm text-slate-900">{tpl.name}</h4>
+                    {tpl.description && <p className="text-xs text-slate-500">{tpl.description}</p>}
+                    <div className="flex items-center gap-2 text-[11px] text-slate-500">
+                      <span>{tpl.subject} ({tpl.className})</span>
+                      <span>•</span>
+                      <span>{tpl.totalMarks} Marks</span>
+                    </div>
+                  </div>
+
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={() => handleApplyTemplate(tpl)}
+                  >
+                    Apply
+                  </Button>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex justify-end pt-2 border-t border-slate-100">
+              <Button variant="ghost" size="sm" onClick={() => setShowTemplatesModal(false)}>
+                Close
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -1,5 +1,13 @@
 import { getDatabase } from './db'
-import type { PaperMetadata, ExamSettings, PaperContent, VisualLayout, FullPaper, ExamSectionConfig } from '../types'
+import type {
+  PaperMetadata,
+  ExamSettings,
+  PaperContent,
+  VisualLayout,
+  FullPaper,
+  ExamSectionConfig,
+  PaperSetupTemplate
+} from '../types'
 import { generateId } from '../utils/id'
 
 export const paperService = {
@@ -16,19 +24,64 @@ export const paperService = {
     return db.get('papers', id)
   },
 
-  // Get aggregated full paper
+  // Get aggregated full paper with safe fallback defaults
   async getFullPaper(paperId: string): Promise<FullPaper | null> {
     const db = await getDatabase()
     const metadata = await db.get('papers', paperId)
     if (!metadata) return null
 
-    const settings = await db.get('exam_settings', metadata.examSettingsId)
+    const rawSettings = await db.get('exam_settings', metadata.examSettingsId)
     const content = await db.get('paper_contents', metadata.contentId)
-    const layout = await db.get('visual_layouts', metadata.visualLayoutId)
+    const rawLayout = await db.get('visual_layouts', metadata.visualLayoutId)
 
-    if (!settings || !content || !layout) {
-      console.warn(`Paper ${paperId} has missing linked records:`, { settings, content, layout })
+    if (!rawSettings || !content || !rawLayout) {
+      console.warn(`Paper ${paperId} has missing linked records:`, { rawSettings, content, rawLayout })
       return null
+    }
+
+    // Hydrate safe defaults for settings if older record
+    const settings: ExamSettings = {
+      ...rawSettings,
+      studentFields: rawSettings.studentFields || {
+        showName: true,
+        showRollNo: true,
+        showDate: true,
+        showSection: true,
+        showSignature: true,
+        showInvigilatorSign: true
+      },
+      coverPageMode: rawSettings.coverPageMode || 'first_page_top',
+      generalInstructions: rawSettings.generalInstructions || [],
+      sections: (rawSettings.sections || []).map((sec, idx) => ({
+        ...sec,
+        enabled: sec.enabled ?? true,
+        numberingStyle: sec.numberingStyle || 'continuous',
+        targetTypes: sec.targetTypes || (idx === 0 ? ['mcq'] : ['short_answer'])
+      }))
+    }
+
+    // Hydrate safe defaults for layout if older record
+    const layout: VisualLayout = {
+      ...rawLayout,
+      optionSpacingPt: rawLayout.optionSpacingPt ?? 6,
+      mcqOptionLayout: rawLayout.mcqOptionLayout || 'auto',
+      pageCountStrategy: rawLayout.pageCountStrategy || 'auto',
+      targetPageCount: rawLayout.targetPageCount ?? 2,
+      headerFooter: rawLayout.headerFooter || {
+        logoPlacement: (rawLayout.logoPlacement as any) || 'center',
+        showInstitutionName: true,
+        showAddress: true,
+        showContact: true,
+        headerCustomText: '',
+        footerCustomText: rawLayout.footerNote || 'Omega Education Center — Academic Excellence',
+        showPageNumbers: rawLayout.showPageNumbers ?? true,
+        pageNumberPosition: rawLayout.pageNumberPosition || 'bottom_center',
+        showExamNameInFooter: true,
+        separatorLineStyle: 'single',
+        borderStyle: 'none',
+        differentFirstPage: false,
+        firstPageHeaderStyle: 'full'
+      }
     }
 
     return { metadata, settings, content, layout }
@@ -52,20 +105,20 @@ export const paperService = {
     const contentId = generateId('content')
     const visualLayoutId = generateId('layout')
 
-    const subject = params?.subject || 'General Knowledge'
+    const subject = params?.subject || 'Mathematics'
     const className = params?.className || 'Class X'
     const examName = params?.examName || 'Assessment Test 2026'
-    const totalMarks = params?.totalMarks || 50
+    const totalMarks = params?.totalMarks || 80
     const title = params?.title || `${className} - ${subject} ${examName}`
 
     // Fetch default institute profile from app settings or fallback
     const instituteSetting = await db.get('app_settings', 'institute_profile')
     const institute = instituteSetting?.value || {
       name: 'OMEGA EDUCATION CENTER',
-      tagline: 'Empowering Minds, Shaping Futures',
-      affiliation: 'Center Code: OEC-2026',
-      address: 'Knowledge Park, Phase 2',
-      contact: 'Phone: +91 98765 43210'
+      tagline: 'Excellence in Coaching & Board Preparations',
+      affiliation: 'Center Code: OEC-2026 / CBSE & State Board Curriculum',
+      address: 'Knowledge Park, Phase 2, Near City Center',
+      contact: 'Phone: +91 98765 43210 | info@omegaedu.org'
     }
 
     const defaultSections: ExamSectionConfig[] = params?.sections || [
@@ -73,17 +126,45 @@ export const paperService = {
         id: 'sec_a',
         name: 'Section A',
         title: 'Section A: Multiple Choice Questions (1 Mark Each)',
-        totalQuestions: 10,
+        instructions: 'Choose the single most appropriate option for each question.',
+        totalQuestions: 20,
         marksPerQuestion: 1,
-        targetTypes: ['mcq']
+        targetTypes: ['mcq'],
+        enabled: true,
+        numberingStyle: 'continuous'
       },
       {
         id: 'sec_b',
         name: 'Section B',
-        title: 'Section B: Descriptive Questions',
+        title: 'Section B: Short Answer Type I (2 Marks Each)',
+        instructions: 'Very short answer questions. Show basic steps.',
         totalQuestions: 5,
-        marksPerQuestion: 4,
-        targetTypes: ['short_answer', 'long_answer']
+        marksPerQuestion: 2,
+        targetTypes: ['short_answer'],
+        enabled: true,
+        numberingStyle: 'continuous'
+      },
+      {
+        id: 'sec_c',
+        name: 'Section C',
+        title: 'Section C: Short Answer Type II (3 Marks Each)',
+        instructions: 'Short answer questions with working where applicable.',
+        totalQuestions: 6,
+        marksPerQuestion: 3,
+        targetTypes: ['short_answer'],
+        enabled: true,
+        numberingStyle: 'continuous'
+      },
+      {
+        id: 'sec_d',
+        name: 'Section D',
+        title: 'Section D: Long Answer Questions (5 Marks Each)',
+        instructions: 'Detailed analytical problem solving with diagrams.',
+        totalQuestions: 4,
+        marksPerQuestion: 5,
+        targetTypes: ['long_answer'],
+        enabled: true,
+        numberingStyle: 'continuous'
       }
     ]
 
@@ -95,17 +176,27 @@ export const paperService = {
       academicSession: '2026-2027',
       className,
       subject,
-      durationMinutes: params?.durationMinutes || 90,
+      durationMinutes: params?.durationMinutes || 180,
       totalMarks,
       date: new Date().toISOString().split('T')[0],
       generalInstructions: [
-        'Read all instructions and questions carefully before answering.',
+        'This question paper contains structured sections as configured.',
+        'All Questions are compulsory unless internal choice is specified.',
         'Write your Name, Roll Number, and Section clearly on the answer sheet.',
-        'Section A contains MCQs. Choose the single most appropriate option.',
-        'Section B contains descriptive questions with internal choice.',
-        'Keep your answers neat, legible, and clearly numbered.'
+        'Section A comprises MCQs. Choose the single most appropriate option.',
+        'Use of calculators or unauthorized electronic devices is strictly prohibited.'
       ],
       sections: defaultSections,
+      studentFields: {
+        showName: true,
+        showRollNo: true,
+        showDate: true,
+        showSection: true,
+        showSignature: true,
+        showInvigilatorSign: true
+      },
+      coverPageMode: 'first_page_top',
+      customCoverText: '',
       createdAt: now,
       updatedAt: now
     }
@@ -116,6 +207,7 @@ export const paperService = {
       sections: defaultSections.map(sec => ({
         sectionId: sec.id,
         title: sec.title,
+        instructions: sec.instructions,
         questions: []
       })),
       totalCalculatedMarks: 0,
@@ -142,13 +234,32 @@ export const paperService = {
       watermarkText: 'OMEGA EDUCATION CENTER',
       watermarkOpacity: 0.08,
       dividerBetweenQuestions: true,
-      questionSpacingPt: 12,
+      questionSpacingPt: 10,
+      optionSpacingPt: 6,
+      mcqOptionLayout: 'auto',
+      pageCountStrategy: 'auto',
+      targetPageCount: 2,
       sectionBreakNewPage: false,
       showMarksPerQuestion: true,
       marksAlignment: 'right',
       footerNote: 'Omega Education Center — Academic Excellence',
       showPageNumbers: true,
       pageNumberPosition: 'bottom_center',
+      headerFooter: {
+        logoPlacement: 'center',
+        showInstitutionName: true,
+        showAddress: true,
+        showContact: true,
+        headerCustomText: '',
+        footerCustomText: 'Omega Education Center — Academic Excellence',
+        showPageNumbers: true,
+        pageNumberPosition: 'bottom_center',
+        showExamNameInFooter: true,
+        separatorLineStyle: 'single',
+        borderStyle: 'none',
+        differentFirstPage: false,
+        firstPageHeaderStyle: 'full'
+      },
       createdAt: now,
       updatedAt: now
     }
@@ -193,13 +304,14 @@ export const paperService = {
     settings.updatedAt = new Date().toISOString()
     await db.put('exam_settings', settings)
 
-    // Also touch paper metadata updatedAt
+    // Sync paper metadata
     const meta = await db.get('papers', settings.paperId)
     if (meta) {
       meta.subject = settings.subject
       meta.className = settings.className
       meta.examName = settings.examName
       meta.totalMarks = settings.totalMarks
+      meta.title = `${settings.className} - ${settings.subject} ${settings.examName}`
       meta.updatedAt = settings.updatedAt
       await db.put('papers', meta)
     }
@@ -237,6 +349,95 @@ export const paperService = {
     const db = await getDatabase()
     layout.updatedAt = new Date().toISOString()
     await db.put('visual_layouts', layout)
+  },
+
+  // Duplicate an existing paper setup
+  async duplicatePaper(paperId: string): Promise<FullPaper | null> {
+    const original = await this.getFullPaper(paperId)
+    if (!original) return null
+
+    const db = await getDatabase()
+    const now = new Date().toISOString()
+
+    const newPaperId = generateId('paper')
+    const newSettingsId = generateId('setting')
+    const newContentId = generateId('content')
+    const newLayoutId = generateId('layout')
+
+    const newSettings: ExamSettings = {
+      ...original.settings,
+      id: newSettingsId,
+      paperId: newPaperId,
+      examName: `${original.settings.examName} (Copy)`,
+      createdAt: now,
+      updatedAt: now
+    }
+
+    const newContent: PaperContent = {
+      ...original.content,
+      id: newContentId,
+      paperId: newPaperId,
+      sections: original.content.sections.map(s => ({
+        ...s,
+        questions: s.questions.map(q => ({ ...q, id: generateId('q') }))
+      })),
+      createdAt: now,
+      updatedAt: now
+    }
+
+    const newLayout: VisualLayout = {
+      ...original.layout,
+      id: newLayoutId,
+      paperId: newPaperId,
+      createdAt: now,
+      updatedAt: now
+    }
+
+    const newMetadata: PaperMetadata = {
+      ...original.metadata,
+      id: newPaperId,
+      title: `${original.metadata.title} (Copy)`,
+      examSettingsId: newSettingsId,
+      contentId: newContentId,
+      visualLayoutId: newLayoutId,
+      createdAt: now,
+      updatedAt: now
+    }
+
+    const tx = db.transaction(['papers', 'exam_settings', 'paper_contents', 'visual_layouts'], 'readwrite')
+    await tx.objectStore('papers').put(newMetadata)
+    await tx.objectStore('exam_settings').put(newSettings)
+    await tx.objectStore('paper_contents').put(newContent)
+    await tx.objectStore('visual_layouts').put(newLayout)
+    await tx.done
+
+    return { metadata: newMetadata, settings: newSettings, content: newContent, layout: newLayout }
+  },
+
+  // Apply a reusable template to an existing or new paper
+  async applyTemplate(paperId: string, template: PaperSetupTemplate): Promise<void> {
+    const full = await this.getFullPaper(paperId)
+    if (!full) return
+
+    const now = new Date().toISOString()
+    const updatedSettings: ExamSettings = {
+      ...full.settings,
+      ...template.settings,
+      id: full.settings.id,
+      paperId,
+      updatedAt: now
+    }
+
+    const updatedLayout: VisualLayout = {
+      ...full.layout,
+      ...template.layout,
+      id: full.layout.id,
+      paperId,
+      updatedAt: now
+    }
+
+    await this.updateExamSettings(updatedSettings)
+    await this.updateVisualLayout(updatedLayout)
   },
 
   // Delete a paper and all associated data
