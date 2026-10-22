@@ -194,14 +194,15 @@ Important note at bottom of exam sheet.
     const papers = await paperService.getAllPapers()
     expect(papers.length).toBeGreaterThan(0)
     const testPaper = await paperService.getFullPaper(papers[0].id)
+    expect(testPaper).not.toBeNull()
 
     // Calculate marks from sections
-    const totalMarks = testPaper.content.sections.reduce(
+    const totalMarks = testPaper!.content.sections.reduce(
       (sum, s) => sum + s.questions.reduce((qSum, q) => qSum + Number(q.marks), 0),
       0
     )
     expect(totalMarks).toBeGreaterThanOrEqual(0)
-    expect(testPaper.settings.totalMarks).toBeGreaterThan(0)
+    expect(testPaper!.settings.totalMarks).toBeGreaterThan(0)
   })
 
   // 8. IndexedDB Persistence of Question Content
@@ -209,10 +210,11 @@ Important note at bottom of exam sheet.
     const papers = await paperService.getAllPapers()
     const targetPaperId = papers[0].id
     const full = await paperService.getFullPaper(targetPaperId)
+    expect(full).not.toBeNull()
 
     const newQuestion: Question = {
       id: 'q_test_persisted',
-      sectionId: full.content.sections[0].sectionId,
+      sectionId: full!.content.sections[0].sectionId,
       orderNumber: 99,
       type: 'short_answer',
       prompt: 'What is photosynthesis?',
@@ -224,13 +226,13 @@ Important note at bottom of exam sheet.
     }
 
     const updatedContent = {
-      ...full.content,
+      ...full!.content,
       sections: [
         {
-          ...full.content.sections[0],
-          questions: [...full.content.sections[0].questions, newQuestion]
+          ...full!.content.sections[0],
+          questions: [...full!.content.sections[0].questions, newQuestion]
         },
-        ...full.content.sections.slice(1)
+        ...full!.content.sections.slice(1)
       ]
     }
 
@@ -238,7 +240,8 @@ Important note at bottom of exam sheet.
 
     // Reload from IndexedDB to verify persistence
     const reloaded = await paperService.getFullPaper(targetPaperId)
-    const found = reloaded.content.sections[0].questions.find(q => q.id === 'q_test_persisted')
+    expect(reloaded).not.toBeNull()
+    const found = reloaded!.content.sections[0].questions.find(q => q.id === 'q_test_persisted')
     expect(found).toBeDefined()
     expect(found?.prompt).toBe('What is photosynthesis?')
     expect(found?.marks).toBe(3)

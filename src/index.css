@@ -23,14 +23,13 @@
 /* Print optimizations for paper generation */
 @media print {
   @page {
-    size: A4;
-    margin: 12mm 15mm 15mm 15mm;
+    size: auto;
+    margin: 0mm;
   }
 
   body {
     background-color: #fff !important;
     color: #000 !important;
-    font-size: 11pt !important;
   }
 
   header, nav, aside, button, .print\:hidden {
@@ -47,8 +46,9 @@
     box-shadow: none !important;
   }
 
-  .border, .border-slate-200, .border-slate-300 {
-    border-color: #94a3b8 !important;
+  .print\:break-after-page {
+    page-break-after: always !important;
+    break-after: page !important;
   }
 }
 

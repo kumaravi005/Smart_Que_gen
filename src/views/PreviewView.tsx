@@ -1,10 +1,27 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
-import { Eye, Printer, FileDown, FileEdit, Wand2 } from 'lucide-react'
+import {
+  Eye,
+  Printer,
+  FileDown,
+  FileEdit,
+  Wand2,
+  ChevronLeft,
+  ChevronRight,
+  Layers,
+  Columns,
+  Maximize2,
+  AlertTriangle,
+  ZoomIn,
+  ZoomOut
+} from 'lucide-react'
 import { usePaperDetails } from '../hooks/usePaperDetails'
 import { usePapers } from '../hooks/usePapers'
 import { Button } from '../components/common/Button'
 import { Badge } from '../components/common/Badge'
+import { PaperSheet } from '../components/preview/PaperSheet'
+import { paginatePaper } from '../utils/paginationEngine'
+import type { ColumnLayout, PageOrientation } from '../types'
 
 export const PreviewView: React.FC = () => {
   const [searchParams] = useSearchParams()
@@ -12,79 +29,99 @@ export const PreviewView: React.FC = () => {
   const { papers } = usePapers()
 
   const paperId = searchParams.get('paperId') || (papers.length > 0 ? papers[0].id : '')
-  const { paper, loading } = usePaperDetails(paperId)
+  const { paper, loading, saveLayout } = usePaperDetails(paperId)
+
+  // View state
+  const [activePageIndex, setActivePageIndex] = useState<number>(0)
+  const [viewMode, setViewMode] = useState<'single' | 'all'>('single')
+  const [zoomLevel, setZoomLevel] = useState<number>(100)
+  const [isApplyingAdjustment, setIsApplyingAdjustment] = useState(false)
 
   const handlePrint = () => {
     window.print()
   }
 
+  // Quick layout adjustments directly on preview
+  const handleToggleColumns = async () => {
+    if (!paper) return
+    const nextCol: ColumnLayout = paper.layout.columnLayout === 'two_column' ? 'single' : 'two_column'
+    setIsApplyingAdjustment(true)
+    await saveLayout({
+      ...paper.layout,
+      columnLayout: nextCol
+    })
+    setIsApplyingAdjustment(false)
+  }
+
+  const handleToggleOrientation = async () => {
+    if (!paper) return
+    const nextOrient: PageOrientation = paper.layout.orientation === 'landscape' ? 'portrait' : 'landscape'
+    setIsApplyingAdjustment(true)
+    await saveLayout({
+      ...paper.layout,
+      orientation: nextOrient
+    })
+    setIsApplyingAdjustment(false)
+  }
+
+  const handleQuickFontSize = async (pt: number) => {
+    if (!paper) return
+    setIsApplyingAdjustment(true)
+    await saveLayout({
+      ...paper.layout,
+      fontSizePt: pt
+    })
+    setIsApplyingAdjustment(false)
+  }
+
+  const handleApplyCompactMargins = async () => {
+    if (!paper) return
+    setIsApplyingAdjustment(true)
+    await saveLayout({
+      ...paper.layout,
+      pageMarginsMm: { top: 10, bottom: 10, left: 10, right: 10 }
+    })
+    setIsApplyingAdjustment(false)
+  }
+
   if (loading) {
-    return <div className="p-12 text-center text-slate-500">Generating live preview...</div>
+    return (
+      <div className="p-16 text-center text-slate-500 space-y-3">
+        <div className="inline-block w-8 h-8 border-3 border-amber-600 border-t-transparent rounded-full animate-spin" />
+        <h3 className="font-bold text-slate-800 text-base">Generating Live Paginated Paper Preview...</h3>
+        <p className="text-xs text-slate-400">Calculating physical page boundaries and layout typography</p>
+      </div>
+    )
   }
 
   if (!paper) {
     return (
-      <div className="p-8 bg-white rounded-3xl border border-slate-200 text-center space-y-4">
-        <Eye className="w-10 h-10 text-slate-400 mx-auto" />
-        <h2 className="text-lg font-bold text-slate-800">No Paper Selected</h2>
-        <p className="text-sm text-slate-500">Please choose a paper to preview.</p>
+      <div className="p-10 bg-white rounded-3xl border border-slate-200 text-center space-y-4 max-w-md mx-auto my-12">
+        <Eye className="w-12 h-12 text-slate-400 mx-auto" />
+        <h2 className="text-xl font-bold text-slate-800">No Paper Selected</h2>
+        <p className="text-sm text-slate-500">
+          Please select or create an examination paper to view live preview.
+        </p>
         <Button variant="primary" onClick={() => navigate('/')}>
-          Go to Dashboard
+          Return to Dashboard
         </Button>
       </div>
     )
   }
 
-  const { settings, content, layout } = paper
-  const isTwoColumn = layout.columnLayout === 'two_column'
-  const hf = layout.headerFooter || {
-    logoPlacement: layout.logoPlacement || 'center',
-    showInstitutionName: true,
-    showAddress: true,
-    showContact: true,
-    separatorLineStyle: 'single',
-    borderStyle: 'none',
-    footerCustomText: layout.footerNote || 'Omega Education Center — Academic Excellence',
-    showPageNumbers: layout.showPageNumbers ?? true,
-    pageNumberPosition: layout.pageNumberPosition || 'bottom_center',
-    showExamNameInFooter: true
-  }
+  // Automatic Pagination Calculation
+  const pagination = paginatePaper({
+    settings: paper.settings,
+    content: paper.content,
+    layout: paper.layout
+  })
 
-  const studentFields = settings.studentFields || {
-    showName: true,
-    showRollNo: true,
-    showDate: true,
-    showSection: true,
-    showSignature: true,
-    showInvigilatorSign: true
-  }
-
-  // Helper for MCQ options grid class
-  const getOptionGridClass = () => {
-    const mode = layout.mcqOptionLayout || 'auto'
-    if (mode === 'four_per_row') return 'grid grid-cols-4 gap-2'
-    if (mode === 'two_per_row') return 'grid grid-cols-2 gap-2'
-    if (mode === 'one_per_row') return 'grid grid-cols-1 gap-1'
-    // auto
-    return isTwoColumn ? 'grid grid-cols-2 gap-2' : 'grid grid-cols-2 sm:grid-cols-4 gap-2'
-  }
-
-  const separatorClass =
-    hf.separatorLineStyle === 'double'
-      ? 'border-b-4 border-double border-slate-900'
-      : hf.separatorLineStyle === 'none'
-      ? ''
-      : 'border-b-2 border-slate-900'
-
-  const borderContainerClass =
-    hf.borderStyle === 'outer_box'
-      ? 'border-4 border-slate-900'
-      : hf.borderStyle === 'header_box'
-      ? ''
-      : 'border border-slate-300'
+  const { pages, totalPages, fitsTarget, targetFitExplanation } = pagination
+  const safePageIndex = Math.min(Math.max(0, activePageIndex), Math.max(0, totalPages - 1))
+  const currentPage = pages[safePageIndex] || pages[0]
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto">
+    <div className="space-y-6 max-w-5xl mx-auto pb-24">
       {/* Top Banner (hidden in print) */}
       <div className="print:hidden flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 sm:p-6 rounded-3xl border border-slate-200/90 shadow-xs">
         <div className="flex items-center gap-3">
@@ -95,31 +132,38 @@ export const PreviewView: React.FC = () => {
             <div className="flex items-center gap-2">
               <span className="text-xs font-bold text-amber-600 uppercase tracking-wider">Module 6</span>
               <Badge variant="warning" size="sm">Live Print Simulator</Badge>
+              <Badge variant="info" size="sm">
+                {totalPages} {totalPages === 1 ? 'Page' : 'Pages'}
+              </Badge>
             </div>
-            <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Live Paper Preview</h1>
+            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 mt-0.5">
+              Live Paper Preview
+            </h1>
             <p className="text-xs text-slate-500">
-              Interactive preview matching physical A4 paper typography and print boundaries.
+              Interactive pagination simulator matching physical A4 paper dimensions and print boundaries.
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button
             variant="outline"
             size="sm"
-            onClick={() => navigate(`/wizard?paperId=${paper.metadata.id}&step=7`)}
+            onClick={() => navigate(`/wizard?paperId=${paper.metadata.id}&step=3`)}
             leftIcon={<Wand2 className="w-4 h-4 text-purple-600" />}
           >
             Setup Wizard
           </Button>
+
           <Button
             variant="outline"
             size="sm"
             onClick={() => navigate(`/editor?paperId=${paper.metadata.id}`)}
-            leftIcon={<FileEdit className="w-4 h-4" />}
+            leftIcon={<FileEdit className="w-4 h-4 text-blue-600" />}
           >
-            Edit Questions
+            Question Editor
           </Button>
+
           <Button
             variant="secondary"
             size="sm"
@@ -128,6 +172,7 @@ export const PreviewView: React.FC = () => {
           >
             Print / PDF
           </Button>
+
           <Button
             variant="primary"
             size="sm"
@@ -139,276 +184,227 @@ export const PreviewView: React.FC = () => {
         </div>
       </div>
 
-      {/* SEPARATE COVER PAGE (Option B) if enabled */}
-      {settings.coverPageMode === 'separate_cover' && (
-        <div className="relative bg-white shadow-xl rounded-xl border border-slate-300 p-12 min-h-[1050px] font-serif text-slate-900 flex flex-col justify-between print:shadow-none print:border-none print:p-8 print:m-0 print:break-after-page">
-          <div className="text-center space-y-3 pt-6">
-            {settings.institute.logoUrl && hf.logoPlacement !== 'none' && (
-              <img
-                src={settings.institute.logoUrl}
-                alt="Logo"
-                className="w-20 h-20 object-contain mx-auto mb-2"
-              />
-            )}
-            <h1 className="text-3xl font-extrabold uppercase tracking-wide">
-              {settings.institute.name}
-            </h1>
-            {settings.institute.tagline && (
-              <p className="text-sm italic font-sans text-slate-600">
-                {settings.institute.tagline}
+      {/* Target Page Overflow Warning Banner */}
+      {!fitsTarget && targetFitExplanation && (
+        <div className="print:hidden p-4 rounded-3xl bg-amber-500/10 border border-amber-300 text-amber-950 space-y-2.5">
+          <div className="flex items-start gap-2.5">
+            <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <h3 className="font-bold text-sm text-amber-950">
+                Target Page Count Exceeded
+              </h3>
+              <p className="text-xs text-amber-900 leading-relaxed">
+                {targetFitExplanation}
               </p>
-            )}
-            {settings.institute.address && (
-              <p className="text-xs font-sans text-slate-500">
-                {settings.institute.address}
-              </p>
-            )}
-
-            <div className="pt-8 space-y-2">
-              <span className="text-xs uppercase font-sans font-bold tracking-widest text-slate-400">
-                Official Examination Question Booklet
-              </span>
-              <h2 className="text-2xl font-bold uppercase">{settings.examName}</h2>
-              <div className="text-base font-sans font-semibold text-slate-700">
-                Academic Session: {settings.academicSession || '2026-2027'}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4 max-w-md mx-auto pt-6 font-sans text-sm text-left border-y border-slate-300 py-4">
-              <div><strong>Subject:</strong> {settings.subject}</div>
-              <div><strong>Class:</strong> {settings.className}</div>
-              <div><strong>Time:</strong> {settings.durationMinutes} Minutes</div>
-              <div><strong>Maximum Marks:</strong> {settings.totalMarks}</div>
             </div>
           </div>
 
-          {/* Student details fill-in table on cover page */}
-          <div className="my-8 font-sans border-2 border-slate-800 rounded-lg p-5 space-y-4 max-w-lg mx-auto w-full">
-            <h3 className="font-bold text-center uppercase tracking-wider text-xs border-b border-slate-300 pb-2">
-              Candidate Examination Information
-            </h3>
-            <div className="space-y-3 text-xs">
-              <div className="flex items-center gap-2">
-                <span className="font-semibold w-24">Student Name:</span>
-                <span className="flex-1 border-b border-slate-400"></span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="font-semibold w-24">Roll Number:</span>
-                <span className="flex-1 border-b border-slate-400"></span>
-              </div>
-              <div className="grid grid-cols-2 gap-4 pt-1">
-                <div className="flex items-center gap-2">
-                  <span className="font-semibold">Section:</span>
-                  <span className="flex-1 border-b border-slate-400"></span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="font-semibold">Exam Date:</span>
-                  <span className="flex-1 border-b border-slate-400">{settings.date || ''}</span>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4 pt-4">
-                <div className="text-center pt-6 border-t border-slate-400 text-[11px] font-semibold text-slate-600">
-                  Candidate&apos;s Signature
-                </div>
-                <div className="text-center pt-6 border-t border-slate-400 text-[11px] font-semibold text-slate-600">
-                  Invigilator&apos;s Signature
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* General instructions on cover page */}
-          <div className="font-sans text-xs space-y-2 p-4 bg-slate-50 border border-slate-200 rounded-lg max-w-xl mx-auto w-full">
-            <div className="font-bold uppercase tracking-wider text-[11px]">Important Instructions:</div>
-            <ol className="list-decimal pl-4 space-y-1 text-slate-700">
-              {settings.generalInstructions?.map((inst: string, i: number) => (
-                <li key={i}>{inst}</li>
-              ))}
-            </ol>
-            {settings.customCoverText && (
-              <div className="pt-2 text-[11px] italic text-slate-600 border-t border-slate-200">
-                {settings.customCoverText}
-              </div>
+          <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-amber-200/80">
+            <span className="text-[11px] font-bold text-amber-900 uppercase">1-Click Fixes:</span>
+            {paper.layout.columnLayout !== 'two_column' && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleToggleColumns}
+                disabled={isApplyingAdjustment}
+                leftIcon={<Columns className="w-3.5 h-3.5" />}
+              >
+                Switch to 2-Column
+              </Button>
             )}
-          </div>
-
-          <div className="text-center font-sans text-[11px] text-slate-400 pt-4">
-            Do not turn the page until instructed by the examination invigilator.
+            {(paper.layout.pageMarginsMm?.top || 15) > 10 && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleApplyCompactMargins}
+                disabled={isApplyingAdjustment}
+                leftIcon={<Maximize2 className="w-3.5 h-3.5" />}
+              >
+                Apply Compact Margins (10mm)
+              </Button>
+            )}
+            {(paper.layout.fontSizePt || 11) > 10.5 && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => handleQuickFontSize(10.5)}
+                disabled={isApplyingAdjustment}
+              >
+                Set Font to 10.5pt
+              </Button>
+            )}
           </div>
         </div>
       )}
 
-      {/* QUESTION SHEET CONTAINER */}
-      <div
-        className={`relative bg-white shadow-xl rounded-xl ${borderContainerClass} p-8 sm:p-12 min-h-[1050px] font-serif text-slate-900 print:shadow-none print:border-none print:p-0 print:m-0 overflow-hidden`}
-        style={{ fontFamily: layout.fontFamily === 'serif' ? 'Times New Roman, serif' : 'Inter, sans-serif' }}
-      >
-        {/* Anti-piracy Watermark */}
-        {layout.showWatermark && (
-          <div
-            className="absolute inset-0 flex items-center justify-center pointer-events-none select-none z-0"
-            style={{ opacity: layout.watermarkOpacity || 0.08 }}
+      {/* Interactive Preview Controls & Page Navigation Toolbar (hidden in print) */}
+      <div className="print:hidden flex flex-wrap items-center justify-between gap-3 bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200/90 shadow-xs text-xs font-semibold text-slate-700 sticky top-4 z-20">
+        {/* Page Navigation Controls */}
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={viewMode === 'all' || safePageIndex === 0}
+            onClick={() => setActivePageIndex(prev => Math.max(0, prev - 1))}
+            leftIcon={<ChevronLeft className="w-4 h-4" />}
           >
-            <span className="text-5xl sm:text-6xl font-black font-sans uppercase -rotate-45 tracking-widest text-slate-900 text-center">
-              {layout.watermarkText || 'OMEGA EDUCATION CENTER'}
-            </span>
-          </div>
-        )}
+            Prev Page
+          </Button>
 
-        <div className="relative z-10 space-y-6">
-          {/* Header Section (if not in separate cover or top of questions) */}
-          <div className={`space-y-1.5 pb-4 ${separatorClass}`}>
-            <div className={`flex flex-col ${
-              hf.logoPlacement === 'left' ? 'sm:flex-row items-center gap-4 text-left' :
-              hf.logoPlacement === 'right' ? 'sm:flex-row-reverse items-center gap-4 text-right' :
-              'text-center'
-            }`}>
-              {settings.institute.logoUrl && hf.logoPlacement !== 'none' && (
-                <img
-                  src={settings.institute.logoUrl}
-                  alt="Logo"
-                  className="w-16 h-16 object-contain shrink-0 mx-auto sm:mx-0 mb-1"
-                />
-              )}
-
-              <div className="flex-1">
-                {hf.showInstitutionName && (
-                  <h1 className="text-2xl sm:text-3xl font-extrabold uppercase tracking-wide">
-                    {settings.institute.name}
-                  </h1>
-                )}
-                {settings.institute.tagline && (
-                  <p className="text-xs sm:text-sm italic font-sans text-slate-700">
-                    {settings.institute.tagline}
-                  </p>
-                )}
-                {hf.showAddress && settings.institute.address && (
-                  <p className="text-[11px] font-sans text-slate-600">
-                    {settings.institute.address}
-                  </p>
-                )}
-              </div>
-            </div>
-
-            <div className="text-center pt-2 text-base sm:text-lg font-bold tracking-tight">
-              {settings.examName} {settings.academicSession ? `(${settings.academicSession})` : ''}
-            </div>
-
-            {/* Exam Meta Bar */}
-            <div className="pt-2 font-sans flex flex-wrap items-center justify-between text-xs sm:text-sm font-semibold border-t border-slate-400 mt-2 px-2">
-              <div>Subject: {settings.subject} {settings.subjectCode ? `(${settings.subjectCode})` : ''}</div>
-              <div>Class: {settings.className}</div>
-              <div>Time: {Math.floor(settings.durationMinutes / 60)}h {settings.durationMinutes % 60 ? `${settings.durationMinutes % 60}m` : ''}</div>
-              <div>Max Marks: {settings.totalMarks}</div>
-            </div>
-
-            {/* Candidate Info Block (if enabled on first page) */}
-            {settings.coverPageMode !== 'separate_cover' && (studentFields.showName || studentFields.showRollNo) && (
-              <div className="mt-2 pt-2 border-t border-dashed border-slate-300 font-sans text-xs flex flex-wrap items-center justify-between gap-3 px-2 bg-slate-50/60 p-1.5 rounded">
-                {studentFields.showName && (
-                  <div className="flex items-center gap-1.5 flex-1 min-w-[160px]">
-                    <span className="font-semibold text-slate-600">Name:</span>
-                    <span className="flex-1 border-b border-slate-400"></span>
-                  </div>
-                )}
-                {studentFields.showRollNo && (
-                  <div className="flex items-center gap-1.5 w-32">
-                    <span className="font-semibold text-slate-600">Roll No:</span>
-                    <span className="flex-1 border-b border-slate-400"></span>
-                  </div>
-                )}
-                {studentFields.showSection && (
-                  <div className="flex items-center gap-1.5 w-24">
-                    <span className="font-semibold text-slate-600">Sec:</span>
-                    <span className="flex-1 border-b border-slate-400"></span>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* General Instructions (if on top of first page) */}
-          {settings.coverPageMode !== 'separate_cover' && settings.generalInstructions && settings.generalInstructions.length > 0 && (
-            <div className="font-sans text-xs space-y-1 p-3 bg-slate-50 rounded-lg border border-slate-200">
-              <div className="font-bold uppercase tracking-wider text-[11px] text-slate-800">
-                General Instructions:
-              </div>
-              <ol className="list-decimal pl-4 space-y-0.5 text-slate-700">
-                {settings.generalInstructions.map((inst: string, i: number) => (
-                  <li key={i}>{inst}</li>
-                ))}
-              </ol>
-            </div>
-          )}
-
-          {/* Paper Sections & Questions */}
-          <div className="space-y-6">
-            {content.sections.map(sec => (
-              <div key={sec.sectionId} className="space-y-3">
-                <div className="text-center font-sans font-bold uppercase text-sm tracking-wider py-1 bg-slate-100 border-y border-slate-300">
-                  {sec.title}
-                </div>
-                {sec.instructions && (
-                  <div className="text-xs italic font-sans text-slate-600 text-center">
-                    {sec.instructions}
-                  </div>
-                )}
-
-                <div className={isTwoColumn ? 'grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3' : 'space-y-3'}>
-                  {sec.questions.map((q, idx: number) => (
-                    <div
-                      key={q.id}
-                      className={`text-sm ${
-                        layout.dividerBetweenQuestions && idx !== 0 ? 'pt-2.5 border-t border-slate-200' : ''
-                      }`}
-                      style={{ fontSize: `${layout.fontSizePt || 11}pt`, lineHeight: layout.lineSpacing || 1.25 }}
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex items-start gap-2 flex-1">
-                          <span className="font-bold shrink-0">{idx + 1}.</span>
-                          <div className="space-y-1.5 flex-1">
-                            <span className="leading-relaxed">{q.prompt}</span>
-
-                            {/* MCQs Option Layout with selected grid arrangement */}
-                            {q.options && q.options.length > 0 && (
-                              <div className={`pt-1 font-sans text-xs ${getOptionGridClass()}`}>
-                                {q.options.map(opt => (
-                                  <div key={opt.id} className="flex items-baseline gap-1.5">
-                                    <span className="font-bold">({opt.label})</span>
-                                    <span>{opt.text}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-
-                        {layout.showMarksPerQuestion && (
-                          <span className="font-sans text-xs font-bold text-slate-700 shrink-0 ml-2">
-                            [{q.marks}]
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
+          {/* Jump to page select */}
+          <select
+            value={safePageIndex}
+            onChange={e => {
+              setActivePageIndex(Number(e.target.value))
+              setViewMode('single')
+            }}
+            disabled={viewMode === 'all'}
+            className="px-2.5 py-1.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-800"
+          >
+            {pages.map((p, idx) => (
+              <option key={p.pageNumber} value={idx}>
+                Page {p.pageNumber} of {totalPages} {p.isCoverPage ? '(Cover)' : ''}
+              </option>
             ))}
-          </div>
+          </select>
 
-          {/* Running Footer Note & Page Number */}
-          <div className="pt-8 border-t border-slate-300 flex items-center justify-between font-sans text-xs text-slate-500">
-            <div>
-              {hf.showExamNameInFooter ? `${settings.subject} - ${settings.examName} | ` : ''}
-              {hf.footerCustomText || layout.footerNote || ''}
-            </div>
-            {hf.showPageNumbers && (
-              <div className="font-semibold">
-                Page 1 of 1
-              </div>
-            )}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={viewMode === 'all' || safePageIndex >= totalPages - 1}
+            onClick={() => setActivePageIndex(prev => Math.min(totalPages - 1, prev + 1))}
+            rightIcon={<ChevronRight className="w-4 h-4" />}
+          >
+            Next Page
+          </Button>
+
+          <span className="text-slate-300">|</span>
+
+          {/* View Mode Toggle */}
+          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
+            <button
+              type="button"
+              onClick={() => setViewMode('single')}
+              className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all ${
+                viewMode === 'single'
+                  ? 'bg-white text-blue-700 shadow-2xs font-bold'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Single Page
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('all')}
+              className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all ${
+                viewMode === 'all'
+                  ? 'bg-white text-blue-700 shadow-2xs font-bold'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              All {totalPages} Pages
+            </button>
           </div>
         </div>
+
+        {/* Quick Layout Tweak Buttons */}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Column Toggle */}
+          <button
+            type="button"
+            onClick={handleToggleColumns}
+            disabled={isApplyingAdjustment}
+            className={`px-2.5 py-1.5 rounded-xl border flex items-center gap-1.5 transition-all ${
+              paper.layout.columnLayout === 'two_column'
+                ? 'bg-blue-50 border-blue-400 text-blue-700 font-bold'
+                : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+            }`}
+            title="Toggle between Single-Column and Two-Column layout"
+          >
+            <Columns className="w-3.5 h-3.5" />
+            <span>{paper.layout.columnLayout === 'two_column' ? '2 Columns' : '1 Column'}</span>
+          </button>
+
+          {/* Orientation Toggle */}
+          <button
+            type="button"
+            onClick={handleToggleOrientation}
+            disabled={isApplyingAdjustment}
+            className={`px-2.5 py-1.5 rounded-xl border flex items-center gap-1.5 transition-all ${
+              paper.layout.orientation === 'landscape'
+                ? 'bg-purple-50 border-purple-400 text-purple-700 font-bold'
+                : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+            }`}
+            title="Toggle Page Orientation"
+          >
+            <Layers className="w-3.5 h-3.5" />
+            <span>{paper.layout.orientation === 'landscape' ? 'Landscape' : 'Portrait'}</span>
+          </button>
+
+          {/* Zoom Controls */}
+          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
+            <button
+              type="button"
+              disabled={zoomLevel <= 70}
+              onClick={() => setZoomLevel(prev => Math.max(70, prev - 15))}
+              className="p-1 text-slate-600 hover:text-slate-900 rounded"
+              title="Zoom Out"
+            >
+              <ZoomOut className="w-3.5 h-3.5" />
+            </button>
+            <span className="text-[11px] font-mono px-1 font-bold text-slate-700">
+              {zoomLevel}%
+            </span>
+            <button
+              type="button"
+              disabled={zoomLevel >= 130}
+              onClick={() => setZoomLevel(prev => Math.min(130, prev + 15))}
+              className="p-1 text-slate-600 hover:text-slate-900 rounded"
+              title="Zoom In"
+            >
+              <ZoomIn className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Pages Container */}
+      <div
+        className="space-y-8 transition-transform duration-200 origin-top flex flex-col items-center"
+        style={{ transform: zoomLevel !== 100 ? `scale(${zoomLevel / 100})` : undefined }}
+      >
+        {viewMode === 'single' ? (
+          <div className="w-full flex flex-col items-center space-y-2">
+            <div className="print:hidden text-xs font-semibold text-slate-400">
+              Page {currentPage.pageNumber} of {totalPages} {currentPage.isCoverPage ? '— Cover Page' : ''}
+            </div>
+            <PaperSheet
+              page={currentPage}
+              totalPages={totalPages}
+              settings={paper.settings}
+              layout={paper.layout}
+            />
+          </div>
+        ) : (
+          pages.map((p) => (
+            <div key={p.pageNumber} className="w-full flex flex-col items-center space-y-2">
+              <div className="print:hidden text-xs font-semibold text-slate-400">
+                Page {p.pageNumber} of {totalPages} {p.isCoverPage ? '— Cover Page' : ''}
+              </div>
+              <PaperSheet
+                page={p}
+                totalPages={totalPages}
+                settings={paper.settings}
+                layout={paper.layout}
+              />
+            </div>
+          ))
+        )}
       </div>
     </div>
   )
