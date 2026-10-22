@@ -13,7 +13,8 @@ import {
   Maximize2,
   AlertTriangle,
   ZoomIn,
-  ZoomOut
+  ZoomOut,
+  Palette
 } from 'lucide-react'
 import { usePaperDetails } from '../hooks/usePaperDetails'
 import { usePapers } from '../hooks/usePapers'
@@ -162,6 +163,15 @@ export const PreviewView: React.FC = () => {
             leftIcon={<FileEdit className="w-4 h-4 text-blue-600" />}
           >
             Question Editor
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => navigate(`/designer?paperId=${paper.metadata.id}`)}
+            leftIcon={<Palette className="w-4 h-4 text-pink-600" />}
+          >
+            Visual Designer
           </Button>
 
           <Button
@@ -388,6 +398,7 @@ export const PreviewView: React.FC = () => {
               totalPages={totalPages}
               settings={paper.settings}
               layout={paper.layout}
+              questions={(paper.content.sections || []).flatMap(s => s.questions || [])}
             />
           </div>
         ) : (
@@ -401,6 +412,7 @@ export const PreviewView: React.FC = () => {
                 totalPages={totalPages}
                 settings={paper.settings}
                 layout={paper.layout}
+                questions={(paper.content.sections || []).flatMap(s => s.questions || [])}
               />
             </div>
           ))

@@ -1,6 +1,6 @@
 import React from 'react'
 import type { GeneratedPage } from '../../types/pageLayout'
-import type { ExamSettings, VisualLayout } from '../../types'
+import type { ExamSettings, VisualLayout, Question } from '../../types'
 import { estimateMcqOptionGrid } from '../../utils/mcqLayout'
 
 interface PaperSheetProps {
@@ -8,13 +8,15 @@ interface PaperSheetProps {
   totalPages: number
   settings: ExamSettings
   layout: VisualLayout
+  questions?: Question[]
 }
 
 export const PaperSheet: React.FC<PaperSheetProps> = ({
   page,
   totalPages,
   settings,
-  layout
+  layout,
+  questions
 }) => {
   const isLandscape = layout.orientation === 'landscape'
   const isTwoColumn = page.hasTwoColumns
@@ -58,15 +60,20 @@ export const PaperSheet: React.FC<PaperSheetProps> = ({
     ? { minHeight: '210mm', width: '100%', maxWidth: '297mm' }
     : { minHeight: '297mm', width: '100%', maxWidth: '210mm' }
 
+  const isManualMode = layout.designData?.mode === 'manual' && (layout.designData.elements || []).length > 0
+  const manualElementsForPage = isManualMode
+    ? (layout.designData?.elements || []).filter(el => el.pageIndex === (page.pageNumber - 1))
+    : []
+
   return (
     <div
       className={`relative mx-auto bg-white shadow-xl ${borderContainerClass} print:shadow-none print:border-none print:m-0 print:p-0 print:break-after-page rounded-md flex flex-col justify-between transition-all duration-200 select-text`}
       style={{
         ...sheetDimensionsStyle,
-        paddingTop: `${margins.top}mm`,
-        paddingBottom: `${margins.bottom}mm`,
-        paddingLeft: `${margins.left}mm`,
-        paddingRight: `${margins.right}mm`,
+        paddingTop: isManualMode ? 0 : `${margins.top}mm`,
+        paddingBottom: isManualMode ? 0 : `${margins.bottom}mm`,
+        paddingLeft: isManualMode ? 0 : `${margins.left}mm`,
+        paddingRight: isManualMode ? 0 : `${margins.right}mm`,
         fontFamily: fontFamilyStyle,
         boxSizing: 'border-box'
       }}
@@ -84,6 +91,131 @@ export const PaperSheet: React.FC<PaperSheetProps> = ({
       )}
 
       {/* Main Content Area */}
+      {isManualMode && manualElementsForPage.length > 0 ? (
+        <div className="relative w-full h-full min-h-[inherit]">
+          {manualElementsForPage.map(el => {
+            const linkedQuestion = questions?.find(q => q.id === el.questionId)
+            return (
+              <div
+                key={el.id}
+                className="absolute overflow-hidden"
+                style={{
+                  left: `${el.x}mm`,
+                  top: `${el.y}mm`,
+                  width: `${el.width}mm`,
+                  height: `${el.height}mm`,
+                  zIndex: el.zIndex,
+                  backgroundColor: el.backgroundColor || 'transparent',
+                  borderWidth: el.borderWidth !== undefined ? `${el.borderWidth}px` : undefined,
+                  borderColor: el.borderColor || '#cbd5e1',
+                  borderStyle: el.borderStyle || 'none',
+                  padding: el.paddingMm ? `${el.paddingMm}mm` : undefined,
+                  boxSizing: 'border-box'
+                }}
+              >
+                <div
+                  className="w-full h-full overflow-hidden text-slate-900 select-text font-serif leading-snug"
+                  style={{
+                    fontSize: el.fontSizePt ? `${el.fontSizePt}pt` : '11pt',
+                    fontWeight: el.bold ? 'bold' : 'normal',
+                    fontStyle: el.italic ? 'italic' : 'normal',
+                    textAlign: el.alignment || 'left',
+                    color: el.color || '#0f172a'
+                  }}
+                >
+                  {el.type === 'header' ? (
+                    <div className="w-full text-center space-y-1">
+                      <h2 className="text-base font-extrabold uppercase font-serif tracking-wider">
+                        {settings.institute.name}
+                      </h2>
+                      <p className="text-xs font-sans font-bold text-slate-800">
+                        {settings.examName} • {settings.subject} ({settings.className})
+                      </p>
+                      <div className="flex justify-between text-[11px] font-sans border-t border-slate-300 pt-1">
+                        <span>Time: {settings.durationMinutes} Mins</span>
+                        <span>Max Marks: {settings.totalMarks}</span>
+                      </div>
+                    </div>
+                  ) : el.type === 'logo' ? (
+                    <div className="w-full h-full flex items-center justify-center">
+                      {el.imageUrl || settings.institute.logoUrl ? (
+                        <img
+                          src={el.imageUrl || settings.institute.logoUrl}
+                          alt="Logo"
+                          className="max-w-full max-h-full object-contain pointer-events-none"
+                        />
+                      ) : (
+                        <span className="text-xs font-sans text-slate-400">Institute Logo</span>
+                      )}
+                    </div>
+                  ) : el.type === 'image' ? (
+                    <div className="w-full h-full flex items-center justify-center bg-slate-50 border border-slate-200 rounded">
+                      {el.imageUrl ? (
+                        <img
+                          src={el.imageUrl}
+                          alt="Figure"
+                          className="max-w-full max-h-full object-contain pointer-events-none"
+                        />
+                      ) : (
+                        <span className="text-xs font-sans text-slate-400">Figure / Diagram</span>
+                      )}
+                    </div>
+                  ) : el.type === 'line_h' ? (
+                    <div className="w-full h-full flex items-center">
+                      <hr className="w-full border-t border-slate-900" />
+                    </div>
+                  ) : el.type === 'line_v' ? (
+                    <div className="w-full h-full flex justify-center">
+                      <div className="h-full border-l border-slate-900" />
+                    </div>
+                  ) : el.type === 'section_header' ? (
+                    <div className="w-full h-full flex items-center justify-center font-sans font-bold uppercase text-xs tracking-wider bg-slate-100 border-y border-slate-300 px-2">
+                      {el.text || 'Section Header'}
+                    </div>
+                  ) : el.type === 'question_block' ? (
+                    <div className="w-full h-full space-y-1">
+                      <div className="flex items-start justify-between gap-1">
+                        <span className="font-bold text-slate-900 shrink-0">
+                          {el.displayNumber || ''}
+                        </span>
+                        <p className="flex-1 text-slate-800 text-xs sm:text-sm font-medium leading-relaxed">
+                          {linkedQuestion?.prompt || el.text}
+                        </p>
+                        {linkedQuestion?.marks && (
+                          <span className="text-xs font-bold font-sans text-slate-700 shrink-0">
+                            [{linkedQuestion.marks}]
+                          </span>
+                        )}
+                      </div>
+
+                      {/* MCQ Options preview if applicable */}
+                      {linkedQuestion?.options && (
+                        <div className="grid grid-cols-2 gap-1 text-[11px] font-sans pt-1">
+                          {linkedQuestion.options.map((opt) => (
+                            <div key={opt.id} className="truncate">
+                              <span className="font-bold">({opt.label})</span> {opt.text}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ) : el.type === 'footer' ? (
+                    <div className="w-full flex items-center justify-between text-[11px] font-sans border-t border-slate-300 pt-1 text-slate-500">
+                      <span>{settings.examName}</span>
+                      <span>Page {page.pageNumber} of {totalPages}</span>
+                    </div>
+                  ) : (
+                    // General Text Block or Box
+                    <div className="w-full h-full break-words">
+                      {el.text || (el.type === 'box' ? '' : 'Text block')}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      ) : (
       <div className="relative z-10 flex-1 flex flex-col space-y-4">
         {/* Render Page Elements */}
         {page.isCoverPage ? (
@@ -392,9 +524,10 @@ export const PaperSheet: React.FC<PaperSheetProps> = ({
           </div>
         )}
       </div>
+      )}
 
       {/* Running Footer Note & Dynamic Page Number */}
-      {!page.isCoverPage && (
+      {!page.isCoverPage && !isManualMode && (
         <div className="relative z-10 pt-3 border-t border-slate-300 flex items-center justify-between font-sans text-[11px] text-slate-500 mt-4">
           <div className="truncate max-w-[70%]">
             {hf.showExamNameInFooter ? `${settings.subject} — ${settings.examName} | ` : ''}

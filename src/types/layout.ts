@@ -58,6 +58,54 @@ export interface VisualLayout {
   showPageNumbers: boolean
   pageNumberPosition: 'bottom_center' | 'bottom_right'
   headerFooter: HeaderFooterSettings
+  designData?: ManualDesignData
   createdAt: string
   updatedAt: string
+}
+
+export type DesignerElementType =
+  | 'text'
+  | 'logo'
+  | 'image'
+  | 'box'
+  | 'line_h'
+  | 'line_v'
+  | 'header'
+  | 'footer'
+  | 'section_header'
+  | 'question_block'
+
+export interface DesignerElement {
+  id: string
+  type: DesignerElementType
+  pageIndex: number
+  x: number // mm
+  y: number // mm
+  width: number // mm
+  height: number // mm
+  zIndex: number
+  text?: string
+  fontSizePt?: number
+  bold?: boolean
+  italic?: boolean
+  alignment?: 'left' | 'center' | 'right' | 'justify'
+  borderWidth?: number
+  borderColor?: string
+  borderStyle?: 'solid' | 'dashed' | 'double' | 'none'
+  backgroundColor?: string
+  color?: string
+  paddingMm?: number
+  imageUrl?: string
+  questionId?: string
+  sectionId?: string
+  displayNumber?: string
+  locked?: boolean
+}
+
+export type DesignMode = 'automatic' | 'manual'
+
+export interface ManualDesignData {
+  mode: DesignMode
+  elements: DesignerElement[]
+  activePage?: number
 }
