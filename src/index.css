@@ -1,0 +1,58 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --font-serif: 'Times New Roman', 'Liberation Serif', serif;
+  }
+
+  html {
+    -webkit-tap-highlight-color: transparent;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    font-family: var(--font-sans);
+    background-color: #f8fafc;
+    color: #0f172a;
+    min-height: 100vh;
+    margin: 0;
+  }
+}
+
+/* Print optimizations for paper generation */
+@media print {
+  @page {
+    size: A4;
+    margin: 12mm 15mm 15mm 15mm;
+  }
+
+  body {
+    background-color: #fff !important;
+    color: #000 !important;
+    font-size: 11pt !important;
+  }
+
+  header, nav, aside, button, .print\:hidden {
+    display: none !important;
+  }
+
+  main {
+    padding: 0 !important;
+    margin: 0 !important;
+    max-width: 100% !important;
+  }
+
+  .shadow-xl, .shadow-md, .shadow-xs, .shadow-sm {
+    box-shadow: none !important;
+  }
+
+  .border, .border-slate-200, .border-slate-300 {
+    border-color: #94a3b8 !important;
+  }
+}
+
+/* Safe area inset for mobile phones (iOS notch and home indicator) */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 12px);
+}
