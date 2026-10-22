@@ -6,7 +6,8 @@ import {
   Sparkles,
   HelpCircle,
   ImageIcon,
-  X
+  X,
+  Mic
 } from 'lucide-react'
 import { Modal } from '../common/Modal'
 import { Button } from '../common/Button'
@@ -60,6 +61,119 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
   const [options, setOptions] = useState<MCQOption[]>(defaultOptions)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [validationError, setValidationError] = useState<string | null>(null)
+  const [isListeningPrompt, setIsListeningPrompt] = useState(false)
+
+  // Clean up recognition
+  useEffect(() => {
+    return () => {
+      if ((window as any)._promptRecognition) {
+        try {
+          ;(window as any)._promptRecognition.stop()
+        } catch {}
+      }
+      if ((window as any)._optionRecognition) {
+        try {
+          ;(window as any)._optionRecognition.stop()
+        } catch {}
+      }
+    }
+  }, [])
+
+  const handleToggleVoicePrompt = () => {
+    const SpeechClass = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+    if (!SpeechClass) {
+      alert('Speech recognition is not supported in this browser. Please use Google Chrome or Edge.')
+      return
+    }
+
+    if (isListeningPrompt) {
+      if ((window as any)._promptRecognition) {
+        try {
+          ;(window as any)._promptRecognition.stop()
+        } catch {}
+      }
+      setIsListeningPrompt(false)
+      return
+    }
+
+    try {
+      const recognition = new SpeechClass()
+      recognition.lang = 'en-US'
+      recognition.interimResults = false
+      recognition.continuous = false
+
+      recognition.onresult = (event: any) => {
+        const text = event.results?.[0]?.[0]?.transcript || ''
+        if (text) {
+          setPrompt(prev => (prev.trim() ? `${prev.trim()} ${text}` : text))
+        }
+        setIsListeningPrompt(false)
+      }
+
+      recognition.onerror = () => {
+        setIsListeningPrompt(false)
+      }
+
+      recognition.onend = () => {
+        setIsListeningPrompt(false)
+      }
+
+      ;(window as any)._promptRecognition = recognition
+      recognition.start()
+      setIsListeningPrompt(true)
+    } catch {
+      setIsListeningPrompt(false)
+    }
+  }
+
+  const [activeVoiceOptionIndex, setActiveVoiceOptionIndex] = useState<number | null>(null)
+
+  const handleToggleOptionVoice = (index: number) => {
+    const SpeechClass = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+    if (!SpeechClass) {
+      alert('Speech recognition is not supported in this browser. Please use Google Chrome or Edge.')
+      return
+    }
+
+    if (activeVoiceOptionIndex === index) {
+      if ((window as any)._optionRecognition) {
+        try {
+          ;(window as any)._optionRecognition.stop()
+        } catch {}
+      }
+      setActiveVoiceOptionIndex(null)
+      return
+    }
+
+    try {
+      const recognition = new SpeechClass()
+      recognition.lang = 'en-US'
+      recognition.interimResults = false
+      recognition.continuous = false
+
+      recognition.onresult = (event: any) => {
+        const text = event.results?.[0]?.[0]?.transcript || ''
+        if (text) {
+          handleOptionTextChange(index, text)
+        }
+        setActiveVoiceOptionIndex(null)
+      }
+
+      recognition.onerror = () => {
+        setActiveVoiceOptionIndex(null)
+      }
+
+      recognition.onend = () => {
+        setActiveVoiceOptionIndex(null)
+      }
+
+      ;(window as any)._optionRecognition = recognition
+      recognition.start()
+      setActiveVoiceOptionIndex(index)
+    } catch {
+      setActiveVoiceOptionIndex(null)
+    }
+  }
 
   // Populate form when initialQuestion changes
   useEffect(() => {
@@ -368,7 +482,22 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
             <label className="block text-xs font-semibold text-slate-700 uppercase">
               Question Statement / Problem Prompt <span className="text-rose-500">*</span>
             </label>
-            <span className="text-[11px] text-slate-400">Supports text, inline formulas & markdown</span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleToggleVoicePrompt}
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all border ${
+                  isListeningPrompt
+                    ? 'bg-rose-500 text-white border-rose-600 animate-pulse'
+                    : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
+                }`}
+                title="Dictate question statement using speech recognition"
+              >
+                <Mic className={`w-3.5 h-3.5 ${isListeningPrompt ? 'text-white' : 'text-blue-600'}`} />
+                <span>{isListeningPrompt ? 'Listening...' : 'Voice Dictate'}</span>
+              </button>
+              <span className="text-[11px] text-slate-400 hidden sm:inline">Supports text, inline formulas & markdown</span>
+            </div>
           </div>
           <textarea
             rows={3}
@@ -451,6 +580,20 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
                     placeholder={`Option (${opt.label}) text`}
                     className="flex-1 px-2.5 py-1 text-xs sm:text-sm bg-transparent border-none focus:outline-none text-slate-800"
                   />
+
+                  {/* Option Dictate Button */}
+                  <button
+                    type="button"
+                    onClick={() => handleToggleOptionVoice(i)}
+                    className={`p-1 rounded-md transition-colors ${
+                      activeVoiceOptionIndex === i
+                        ? 'bg-rose-500 text-white animate-pulse'
+                        : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'
+                    }`}
+                    title={`Dictate Option ${opt.label} using speech`}
+                  >
+                    <Mic className="w-3.5 h-3.5" />
+                  </button>
 
                   {opt.isCorrect && (
                     <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />

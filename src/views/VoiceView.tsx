@@ -60,11 +60,15 @@ export const VoiceView: React.FC = () => {
   const [importSuccess, setImportSuccess] = useState<string | null>(null)
   const [speechError, setSpeechError] = useState<string | null>(null)
 
+  // Set default target section (respecting URL sectionId param)
   useEffect(() => {
-    if (paper?.content?.sections && paper.content.sections.length > 0 && !selectedSectionId) {
+    const sectionParam = searchParams.get('sectionId')
+    if (sectionParam && paper?.content?.sections?.some(s => s.sectionId === sectionParam)) {
+      setSelectedSectionId(sectionParam)
+    } else if (paper?.content?.sections && paper.content.sections.length > 0 && !selectedSectionId) {
       setSelectedSectionId(paper.content.sections[0].sectionId)
     }
-  }, [paper, selectedSectionId])
+  }, [paper, selectedSectionId, searchParams])
 
   // Stop recognition on unmount
   useEffect(() => {

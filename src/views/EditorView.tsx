@@ -8,7 +8,9 @@ import {
   Wand2,
   FileSpreadsheet,
   BookOpen,
-  HelpCircle
+  HelpCircle,
+  ScanText,
+  Mic
 } from 'lucide-react'
 import { usePaperDetails } from '../hooks/usePaperDetails'
 import { usePapers } from '../hooks/usePapers'
@@ -426,48 +428,78 @@ export const EditorView: React.FC = () => {
         </div>
       </div>
 
-      {/* Secondary Fast Tools: Bulk Input & Question Bank */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      {/* Fast Input Methods: Bulk Input, Photo OCR, Voice Dictation & Question Bank */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        {/* 1. Bulk Text */}
         <button
           type="button"
           onClick={() => setIsBulkModalOpen(true)}
-          className="flex items-center justify-between p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200/80 rounded-2xl text-left hover:border-blue-300 hover:shadow-xs transition-all group"
+          className="flex flex-col justify-between p-3.5 bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200/80 rounded-2xl text-left hover:border-blue-400 hover:shadow-xs transition-all group"
         >
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-white text-blue-600 shadow-2xs group-hover:scale-105 transition-transform">
-              <FileSpreadsheet className="w-5 h-5" />
+          <div className="flex items-center justify-between w-full mb-2">
+            <div className="p-2 rounded-xl bg-white text-blue-600 shadow-2xs group-hover:scale-105 transition-transform">
+              <FileSpreadsheet className="w-4 h-4" />
             </div>
-            <div>
-              <span className="font-bold text-sm text-slate-900 block">
-                Bulk Text Input & Parser
-              </span>
-              <span className="text-xs text-slate-500">
-                Paste whole exams or multiple questions at once
-              </span>
-            </div>
+            <Badge variant="info" size="sm">Fast Paste</Badge>
           </div>
-          <Badge variant="info" size="sm">Fast Paste</Badge>
+          <div>
+            <span className="font-bold text-xs text-slate-900 block">Bulk Text Input</span>
+            <span className="text-[11px] text-slate-500">Paste whole exams or raw text</span>
+          </div>
         </button>
 
+        {/* 2. Photo OCR */}
+        <button
+          type="button"
+          onClick={() => navigate(`/ocr?paperId=${paper.metadata.id}&sectionId=${activeSectionId}`)}
+          className="flex flex-col justify-between p-3.5 bg-gradient-to-br from-violet-50 to-purple-50 border border-violet-200/80 rounded-2xl text-left hover:border-violet-400 hover:shadow-xs transition-all group"
+        >
+          <div className="flex items-center justify-between w-full mb-2">
+            <div className="p-2 rounded-xl bg-white text-violet-600 shadow-2xs group-hover:scale-105 transition-transform">
+              <ScanText className="w-4 h-4" />
+            </div>
+            <Badge variant="purple" size="sm">Camera OCR</Badge>
+          </div>
+          <div>
+            <span className="font-bold text-xs text-slate-900 block">Photo & OCR Scanner</span>
+            <span className="text-[11px] text-slate-500">Extract Q7/Q9, crop diagrams</span>
+          </div>
+        </button>
+
+        {/* 3. Voice Dictation */}
+        <button
+          type="button"
+          onClick={() => navigate(`/voice?paperId=${paper.metadata.id}&sectionId=${activeSectionId}`)}
+          className="flex flex-col justify-between p-3.5 bg-gradient-to-br from-teal-50 to-emerald-50 border border-teal-200/80 rounded-2xl text-left hover:border-teal-400 hover:shadow-xs transition-all group"
+        >
+          <div className="flex items-center justify-between w-full mb-2">
+            <div className="p-2 rounded-xl bg-white text-teal-600 shadow-2xs group-hover:scale-105 transition-transform">
+              <Mic className="w-4 h-4" />
+            </div>
+            <Badge variant="success" size="sm">Voice</Badge>
+          </div>
+          <div>
+            <span className="font-bold text-xs text-slate-900 block">Voice Dictation</span>
+            <span className="text-[11px] text-slate-500">Speech-to-text MCQ workflow</span>
+          </div>
+        </button>
+
+        {/* 4. Question Bank */}
         <button
           type="button"
           onClick={() => setIsBankModalOpen(true)}
-          className="flex items-center justify-between p-4 bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200/80 rounded-2xl text-left hover:border-purple-300 hover:shadow-xs transition-all group"
+          className="flex flex-col justify-between p-3.5 bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200/80 rounded-2xl text-left hover:border-amber-400 hover:shadow-xs transition-all group"
         >
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-white text-purple-600 shadow-2xs group-hover:scale-105 transition-transform">
-              <BookOpen className="w-5 h-5" />
+          <div className="flex items-center justify-between w-full mb-2">
+            <div className="p-2 rounded-xl bg-white text-amber-600 shadow-2xs group-hover:scale-105 transition-transform">
+              <BookOpen className="w-4 h-4" />
             </div>
-            <div>
-              <span className="font-bold text-sm text-slate-900 block">
-                Question Bank Repository
-              </span>
-              <span className="text-xs text-slate-500">
-                Browse, search, and reuse curated questions
-              </span>
-            </div>
+            <Badge variant="warning" size="sm">Bank</Badge>
           </div>
-          <Badge variant="purple" size="sm">Reuse Bank</Badge>
+          <div>
+            <span className="font-bold text-xs text-slate-900 block">Question Bank</span>
+            <span className="text-[11px] text-slate-500">Browse & reuse repository</span>
+          </div>
         </button>
       </div>
 
