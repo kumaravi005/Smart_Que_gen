@@ -56,7 +56,7 @@ export const LayoutEngineView: React.FC = () => {
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-purple-600 uppercase tracking-wider">Module 4</span>
+              <span className="text-xs font-bold text-purple-600 uppercase tracking-wider">Layout Tool</span>
               <Badge variant="purple" size="sm">Automated Geometry</Badge>
             </div>
             <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Automatic Layout Engine</h1>

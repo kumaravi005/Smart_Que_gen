@@ -84,7 +84,7 @@ export const QuestionBankView: React.FC = () => {
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-emerald-600 uppercase tracking-wider">Module 3</span>
+              <span className="text-xs font-bold text-emerald-600 uppercase tracking-wider">Question Repository</span>
               <Badge variant="success" size="sm">Persistent Bank</Badge>
             </div>
             <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Question Bank</h1>

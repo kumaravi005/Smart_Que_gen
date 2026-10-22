@@ -13,6 +13,7 @@ import { usePapers } from '../hooks/usePapers'
 import { paperService } from '../services/paperService'
 import { templateService } from '../services/templateService'
 import { Button } from '../components/common/Button'
+import { WorkflowStepper } from '../components/common/WorkflowStepper'
 import { WizardStepper, WIZARD_STEPS } from '../components/wizard/WizardStepper'
 import { Step1ExamDetails } from '../components/wizard/Step1ExamDetails'
 import { Step2QuestionCounts } from '../components/wizard/Step2QuestionCounts'
@@ -295,6 +296,16 @@ export const WizardView: React.FC = () => {
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto pb-16">
+      {/* 3-Step Guided Workflow Stepper */}
+      <WorkflowStepper
+        currentStep="setup"
+        paperId={paper.metadata.id}
+        paperTitle={paper.metadata.title}
+        subject={paper.settings.subject}
+        classNameText={paper.settings.className}
+        totalMarks={paper.settings.totalMarks}
+      />
+
       {/* Top Breadcrumb & Actions Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-xs">
         <div className="flex items-center gap-2">

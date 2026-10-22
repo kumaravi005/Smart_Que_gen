@@ -229,7 +229,7 @@ Q9. A metallic sphere of radius 4.2 cm is melted and recast into the shape of a 
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-violet-600 uppercase tracking-wider">Module 9</span>
+              <span className="text-xs font-bold text-violet-600 uppercase tracking-wider">Input Tool</span>
               <Badge variant="purple" size="sm">Camera & OCR</Badge>
               {isOnline ? (
                 <span className="flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">

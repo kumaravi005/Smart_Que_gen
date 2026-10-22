@@ -10,12 +10,14 @@ import {
   BookOpen,
   HelpCircle,
   ScanText,
-  Mic
+  Mic,
+  ArrowRight
 } from 'lucide-react'
 import { usePaperDetails } from '../hooks/usePaperDetails'
 import { usePapers } from '../hooks/usePapers'
 import { Button } from '../components/common/Button'
 import { Badge } from '../components/common/Badge'
+import { WorkflowStepper } from '../components/common/WorkflowStepper'
 import { QuestionCard } from '../components/editor/QuestionCard'
 import { QuestionFormModal } from '../components/editor/QuestionFormModal'
 import { BulkImportModal } from '../components/editor/BulkImportModal'
@@ -364,6 +366,17 @@ export const EditorView: React.FC = () => {
         </div>
       )}
 
+      {/* 3-Step Guided Workflow Stepper */}
+      <WorkflowStepper
+        currentStep="questions"
+        paperId={paper.metadata.id}
+        paperTitle={paper.metadata.title}
+        subject={paper.settings.subject}
+        classNameText={paper.settings.className}
+        totalMarks={paper.settings.totalMarks}
+        questionCount={sections.reduce((acc, s) => acc + (s.questions?.length || 0), 0)}
+      />
+
       {/* Top Banner and Navigation Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 sm:p-6 rounded-3xl border border-slate-200/90 shadow-xs">
         <div className="flex items-center gap-3">
@@ -373,7 +386,7 @@ export const EditorView: React.FC = () => {
           <div>
             <div className="flex items-center gap-2">
               <span className="text-xs font-bold text-indigo-600 uppercase tracking-wider">
-                Module 2
+                Step 2: Add Questions
               </span>
               <Badge variant="info" size="sm">
                 {paper.settings.className} • {paper.settings.subject}
@@ -398,19 +411,9 @@ export const EditorView: React.FC = () => {
             variant="outline"
             size="sm"
             onClick={() => navigate(`/wizard?paperId=${paper.metadata.id}`)}
-            leftIcon={<Wand2 className="w-4 h-4 text-blue-600" />}
+            leftIcon={<Wand2 className="w-4 h-4 text-slate-600" />}
           >
-            Setup Wizard
-          </Button>
-
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => navigate(`/preview?paperId=${paper.metadata.id}`)}
-            leftIcon={<Eye className="w-4 h-4 text-purple-600" />}
-          >
-            Live Preview
+            1. Edit Setup
           </Button>
 
           <Button
@@ -423,7 +426,18 @@ export const EditorView: React.FC = () => {
             }}
             leftIcon={<Plus className="w-4 h-4" />}
           >
-            Add Question
+            + Add Question
+          </Button>
+
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            onClick={() => navigate(`/preview?paperId=${paper.metadata.id}`)}
+            rightIcon={<ArrowRight className="w-4 h-4" />}
+            className="bg-emerald-600 text-white hover:bg-emerald-700 font-bold"
+          >
+            3. Preview & Print
           </Button>
         </div>
       </div>
@@ -669,6 +683,32 @@ export const EditorView: React.FC = () => {
             })}
           </div>
         )}
+      </div>
+
+      {/* Ready to Print Banner at the bottom */}
+      <div className="bg-gradient-to-r from-emerald-50 via-teal-50 to-blue-50 border border-emerald-200/90 rounded-3xl p-6 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <span className="text-xs font-bold uppercase tracking-wider text-emerald-700 bg-emerald-100/70 px-2.5 py-0.5 rounded-full">
+            Step 2 Complete?
+          </span>
+          <h3 className="text-base sm:text-lg font-bold text-slate-900 mt-1">
+            Ready to preview and print your paper?
+          </h3>
+          <p className="text-xs text-slate-600">
+            Proceed to Step 3 to view your formatted A4 layout, download in Word/Excel, or print directly to PDF.
+          </p>
+        </div>
+
+        <Button
+          type="button"
+          variant="primary"
+          size="lg"
+          onClick={() => navigate(`/preview?paperId=${paper.metadata.id}`)}
+          rightIcon={<ArrowRight className="w-4 h-4" />}
+          className="bg-emerald-600 hover:bg-emerald-700 text-white shrink-0 font-bold"
+        >
+          3. Preview & Print Paper ➔
+        </Button>
       </div>
 
       {/* Mobile Sticky Quick Action Bar */}

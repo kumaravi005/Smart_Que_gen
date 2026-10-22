@@ -1,11 +1,10 @@
 import React from 'react'
-import { NavLink } from 'react-router-dom'
+import { NavLink, useLocation, useSearchParams } from 'react-router-dom'
 import {
   LayoutDashboard,
   Wand2,
   FileEdit,
   Database,
-  Layers,
   Palette,
   Eye,
   FileDown,
@@ -14,8 +13,10 @@ import {
   Mic,
   Settings,
   X,
-  Sparkles
+  Sparkles,
+  Layers
 } from 'lucide-react'
+import { usePapers } from '../../hooks/usePapers'
 
 interface SidebarProps {
   isOpen: boolean
@@ -25,31 +26,63 @@ interface SidebarProps {
 interface NavItem {
   to: string
   label: string
-  moduleNum?: string
+  stepNum?: string
   icon: React.ComponentType<{ className?: string }>
   badge?: string
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
-  const primaryNav: NavItem[] = [
-    { to: '/', label: 'Dashboard', icon: LayoutDashboard }
+  const [searchParams] = useSearchParams()
+  const { papers } = usePapers()
+  const location = useLocation()
+
+  // Get active or most recent paper ID for contextual workflow navigation
+  const activePaperId = searchParams.get('paperId') || (papers.length > 0 ? papers[0].id : '')
+  const paperQuery = activePaperId ? `?paperId=${activePaperId}` : ''
+
+  const mainNav: NavItem[] = [
+    { to: '/', label: 'Home Dashboard', icon: LayoutDashboard },
+    { to: `/drafts${paperQuery}`, label: 'My Papers & Drafts', icon: Archive }
   ]
 
-  const modulesNav: NavItem[] = [
-    { to: '/wizard', label: 'Paper Setup Wizard', moduleNum: '1', icon: Wand2 },
-    { to: '/editor', label: 'Question Editor', moduleNum: '2', icon: FileEdit },
-    { to: '/bank', label: 'Question Bank', moduleNum: '3', icon: Database },
-    { to: '/layout', label: 'Automatic Layout', moduleNum: '4', icon: Layers },
-    { to: '/designer', label: 'Visual Designer', moduleNum: '5', icon: Palette },
-    { to: '/preview', label: 'Live Preview', moduleNum: '6', icon: Eye },
-    { to: '/export', label: 'Export Manager', moduleNum: '7', icon: FileDown },
-    { to: '/drafts', label: 'Drafts & Storage', moduleNum: '8', icon: Archive },
-    { to: '/ocr', label: 'Image & OCR', moduleNum: '9', icon: ScanText, badge: 'AI' },
-    { to: '/voice', label: 'Voice Input', moduleNum: '10', icon: Mic, badge: 'Voice' }
+  const workflowSteps: NavItem[] = [
+    {
+      to: `/wizard${paperQuery}`,
+      label: '1. Exam Setup',
+      stepNum: '1',
+      icon: Wand2,
+      badge: 'Step 1'
+    },
+    {
+      to: `/editor${paperQuery}`,
+      label: '2. Question Editor',
+      stepNum: '2',
+      icon: FileEdit,
+      badge: 'Step 2'
+    },
+    {
+      to: `/preview${paperQuery}`,
+      label: '3. Preview & Print',
+      stepNum: '3',
+      icon: Eye,
+      badge: 'Step 3'
+    }
+  ]
+
+  const questionTools: NavItem[] = [
+    { to: `/ocr${paperQuery}`, label: 'Scan Photo (OCR)', icon: ScanText, badge: 'Camera' },
+    { to: `/voice${paperQuery}`, label: 'Voice Dictation', icon: Mic, badge: 'Voice' },
+    { to: '/bank', label: 'Question Bank', icon: Database }
+  ]
+
+  const layoutAndExports: NavItem[] = [
+    { to: `/designer${paperQuery}`, label: 'Visual Paper Designer', icon: Palette },
+    { to: `/layout${paperQuery}`, label: 'Automatic Layout', icon: Layers },
+    { to: `/export${paperQuery}`, label: 'Export Word & Excel', icon: FileDown }
   ]
 
   const bottomNav: NavItem[] = [
-    { to: '/settings', label: 'Settings & Profile', icon: Settings }
+    { to: '/settings', label: 'Institute Profile & Settings', icon: Settings }
   ]
 
   const linkClass = ({ isActive }: { isActive: boolean }) =>
@@ -83,9 +116,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
         {/* Top Header in Drawer */}
         <div className="flex items-center justify-between h-16 px-5 border-b border-slate-100">
           <div className="flex items-center gap-2">
-            <span className="font-bold text-slate-800 tracking-tight">System Navigation</span>
-            <span className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded-sm font-mono">
-              v1.0
+            <span className="font-bold text-slate-800 tracking-tight">Omega Question Hub</span>
+            <span className="text-[10px] bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full font-bold">
+              Coaching v1.0
             </span>
           </div>
           <button
@@ -100,71 +133,112 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
         <div className="flex-1 overflow-y-auto px-3.5 py-4 space-y-6">
           {/* Main Navigation */}
           <div className="space-y-1">
-            {primaryNav.map(item => {
+            {mainNav.map(item => {
               const Icon = item.icon
+              const isItemActive = location.pathname === item.to.split('?')[0]
               return (
                 <NavLink
                   key={item.to}
                   to={item.to}
                   onClick={onClose}
-                  className={linkClass}
+                  className={() => linkClass({ isActive: isItemActive })}
                   end={item.to === '/'}
                 >
-                  {({ isActive }) => (
-                    <div className="flex items-center gap-3">
-                      <Icon className={iconClass(isActive)} />
-                      <span>{item.label}</span>
-                    </div>
-                  )}
+                  <div className="flex items-center gap-3">
+                    <Icon className={iconClass(isItemActive)} />
+                    <span>{item.label}</span>
+                  </div>
                 </NavLink>
               )
             })}
           </div>
 
-          {/* Logical Modules */}
-          <div>
-            <div className="px-3 mb-2 flex items-center justify-between">
-              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
-                10 Core Modules
+          {/* Standard 3-Step Paper Creation Workflow */}
+          <div className="bg-slate-50/80 p-2.5 rounded-2xl border border-slate-200/80">
+            <div className="px-2 mb-2 flex items-center justify-between">
+              <span className="text-[11px] font-bold text-blue-900 uppercase tracking-wider">
+                Create a Paper (3 Steps)
               </span>
-              <span className="text-[10px] text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded-full font-medium">
-                Offline Ready
+              <span className="text-[10px] text-blue-700 bg-blue-100/70 px-1.5 py-0.2 rounded font-semibold">
+                Guided
               </span>
             </div>
             <div className="space-y-1">
-              {modulesNav.map(item => {
+              {workflowSteps.map(item => {
                 const Icon = item.icon
+                const isItemActive = location.pathname === item.to.split('?')[0]
                 return (
                   <NavLink
                     key={item.to}
                     to={item.to}
                     onClick={onClose}
-                    className={linkClass}
+                    className={() => linkClass({ isActive: isItemActive })}
                   >
-                    {({ isActive }) => (
-                      <>
-                        <div className="flex items-center gap-3 truncate">
-                          <Icon className={iconClass(isActive)} />
-                          <span className="truncate">
-                            <span className={`text-[10px] font-mono mr-1.5 opacity-60 ${isActive ? 'text-white' : ''}`}>
-                              {item.moduleNum}.
-                            </span>
-                            {item.label}
-                          </span>
-                        </div>
-                        {item.badge && (
-                          <span
-                            className={`text-[9px] px-1.5 py-0.5 rounded font-medium ${
-                              isActive
-                                ? 'bg-white/20 text-white'
-                                : 'bg-slate-100 text-slate-600'
-                            }`}
-                          >
-                            {item.badge}
-                          </span>
-                        )}
-                      </>
+                    <div className="flex items-center gap-3 truncate">
+                      <Icon className={iconClass(isItemActive)} />
+                      <span className="font-medium text-xs sm:text-sm truncate">{item.label}</span>
+                    </div>
+                  </NavLink>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Question Input Tools */}
+          <div>
+            <div className="px-3 mb-2 flex items-center justify-between">
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                Input Tools
+              </span>
+            </div>
+            <div className="space-y-1">
+              {questionTools.map(item => {
+                const Icon = item.icon
+                const isItemActive = location.pathname === item.to.split('?')[0]
+                return (
+                  <NavLink
+                    key={item.to}
+                    to={item.to}
+                    onClick={onClose}
+                    className={() => linkClass({ isActive: isItemActive })}
+                  >
+                    <div className="flex items-center gap-3">
+                      <Icon className={iconClass(isItemActive)} />
+                      <span>{item.label}</span>
+                    </div>
+                    {item.badge && (
+                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-slate-100 text-slate-600">
+                        {item.badge}
+                      </span>
                     )}
+                  </NavLink>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Layout & Export */}
+          <div>
+            <div className="px-3 mb-2">
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                Layout & Export
+              </span>
+            </div>
+            <div className="space-y-1">
+              {layoutAndExports.map(item => {
+                const Icon = item.icon
+                const isItemActive = location.pathname === item.to.split('?')[0]
+                return (
+                  <NavLink
+                    key={item.to}
+                    to={item.to}
+                    onClick={onClose}
+                    className={() => linkClass({ isActive: isItemActive })}
+                  >
+                    <div className="flex items-center gap-3">
+                      <Icon className={iconClass(isItemActive)} />
+                      <span>{item.label}</span>
+                    </div>
                   </NavLink>
                 )
               })}
@@ -174,26 +248,25 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
           {/* Bottom Settings */}
           <div>
             <div className="px-3 mb-2">
-              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
-                System
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                Settings
               </span>
             </div>
             <div className="space-y-1">
               {bottomNav.map(item => {
                 const Icon = item.icon
+                const isItemActive = location.pathname === item.to.split('?')[0]
                 return (
                   <NavLink
                     key={item.to}
                     to={item.to}
                     onClick={onClose}
-                    className={linkClass}
+                    className={() => linkClass({ isActive: isItemActive })}
                   >
-                    {({ isActive }) => (
-                      <div className="flex items-center gap-3">
-                        <Icon className={iconClass(isActive)} />
-                        <span>{item.label}</span>
-                      </div>
-                    )}
+                    <div className="flex items-center gap-3">
+                      <Icon className={iconClass(isItemActive)} />
+                      <span>{item.label}</span>
+                    </div>
                   </NavLink>
                 )
               })}
@@ -202,15 +275,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
         </div>
 
         {/* Center Footer Card */}
-        <div className="p-4 border-t border-slate-100 bg-slate-50/70">
-          <div className="flex items-start gap-2.5">
-            <div className="p-1.5 rounded-lg bg-blue-100 text-blue-700 mt-0.5">
-              <Sparkles className="w-4 h-4" />
-            </div>
-            <div className="flex-1 text-xs">
-              <p className="font-semibold text-slate-800 leading-tight">Coaching Center Mode</p>
-              <p className="text-slate-500 text-[11px] mt-0.5">IndexedDB saves all changes instantly on device.</p>
-            </div>
+        <div className="p-3.5 border-t border-slate-100 bg-slate-50/70">
+          <div className="flex items-center gap-2 text-xs text-slate-600">
+            <Sparkles className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+            <span className="font-semibold text-slate-700">Coaching Center Mode</span>
+            <span className="text-[10px] text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded font-bold ml-auto">
+              Offline
+            </span>
           </div>
         </div>
       </aside>

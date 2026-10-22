@@ -295,7 +295,7 @@ export const VoiceView: React.FC = () => {
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-blue-600 uppercase tracking-wider">Module 10</span>
+              <span className="text-xs font-bold text-blue-600 uppercase tracking-wider">Input Tool</span>
               <Badge variant="purple" size="sm">Voice Dictation</Badge>
               {isOnline ? (
                 <span className="flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">

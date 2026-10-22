@@ -94,21 +94,21 @@ export const DraftsView: React.FC = () => {
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-cyan-600 uppercase tracking-wider">Module 8</span>
-              <Badge variant="info" size="sm">IndexedDB Engine</Badge>
+              <span className="text-xs font-bold text-cyan-600 uppercase tracking-wider">Saved Papers</span>
+              <Badge variant="info" size="sm">Device Storage</Badge>
               {isOnline ? (
                 <span className="flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">
                   <Wifi className="w-3 h-3" /> Online
                 </span>
               ) : (
                 <span className="flex items-center gap-1 text-[11px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full">
-                  <WifiOff className="w-3 h-3" /> Offline Mode
+                  <WifiOff className="w-3 h-3" /> Offline Ready
                 </span>
               )}
             </div>
-            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 mt-0.5">Local Storage & Drafts</h1>
+            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 mt-0.5">My Examination Papers & Backups</h1>
             <p className="text-xs text-slate-500">
-              Manage saved examinations, revisions, and export or restore full JSON backups.
+              All your question papers are saved securely on this device. You can reopen them anytime offline or export a backup.
             </p>
           </div>
         </div>

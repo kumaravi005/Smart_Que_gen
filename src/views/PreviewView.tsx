@@ -5,7 +5,6 @@ import {
   Printer,
   FileDown,
   FileEdit,
-  Wand2,
   ChevronLeft,
   ChevronRight,
   Layers,
@@ -14,14 +13,22 @@ import {
   AlertTriangle,
   ZoomIn,
   ZoomOut,
-  Palette
+  Palette,
+  FileSpreadsheet
 } from 'lucide-react'
 import { usePaperDetails } from '../hooks/usePaperDetails'
 import { usePapers } from '../hooks/usePapers'
 import { Button } from '../components/common/Button'
 import { Badge } from '../components/common/Badge'
+import { WorkflowStepper } from '../components/common/WorkflowStepper'
 import { PaperSheet } from '../components/preview/PaperSheet'
 import { paginatePaper } from '../utils/paginationEngine'
+import {
+  exportToDocx,
+  exportToXlsx,
+  generateExportFilename,
+  triggerDownload
+} from '../utils/exportManager'
 import type { ColumnLayout, PageOrientation } from '../types'
 
 export const PreviewView: React.FC = () => {
@@ -38,8 +45,38 @@ export const PreviewView: React.FC = () => {
   const [zoomLevel, setZoomLevel] = useState<number>(100)
   const [isApplyingAdjustment, setIsApplyingAdjustment] = useState(false)
 
+  const [downloadingFormat, setDownloadingFormat] = useState<'docx' | 'xlsx' | null>(null)
+
   const handlePrint = () => {
     window.print()
+  }
+
+  const handleDownloadDocx = async () => {
+    if (!paper) return
+    try {
+      setDownloadingFormat('docx')
+      const blob = await exportToDocx(paper)
+      const filename = generateExportFilename(paper, 'docx')
+      triggerDownload(blob, filename)
+    } catch {
+      alert('Failed to generate Word document.')
+    } finally {
+      setDownloadingFormat(null)
+    }
+  }
+
+  const handleDownloadXlsx = () => {
+    if (!paper) return
+    try {
+      setDownloadingFormat('xlsx')
+      const blob = exportToXlsx(paper)
+      const filename = generateExportFilename(paper, 'xlsx')
+      triggerDownload(blob, filename)
+    } catch {
+      alert('Failed to generate Excel spreadsheet.')
+    } finally {
+      setDownloadingFormat(null)
+    }
   }
 
   // Quick layout adjustments directly on preview
@@ -123,73 +160,95 @@ export const PreviewView: React.FC = () => {
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto pb-24">
-      {/* Top Banner (hidden in print) */}
-      <div className="print:hidden flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 sm:p-6 rounded-3xl border border-slate-200/90 shadow-xs">
+      {/* 3-Step Guided Workflow Stepper (hidden in print) */}
+      <div className="print:hidden">
+        <WorkflowStepper
+          currentStep="preview"
+          paperId={paper.metadata.id}
+          paperTitle={paper.metadata.title}
+          subject={paper.settings.subject}
+          classNameText={paper.settings.className}
+          totalMarks={paper.settings.totalMarks}
+          questionCount={(paper.content.sections || []).reduce((acc, s) => acc + (s.questions?.length || 0), 0)}
+        />
+      </div>
+
+      {/* Top Banner and One-Click Export Actions (hidden in print) */}
+      <div className="print:hidden flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white p-5 sm:p-6 rounded-3xl border border-slate-200/90 shadow-xs">
         <div className="flex items-center gap-3">
-          <div className="p-3 rounded-2xl bg-amber-50 text-amber-700 border border-amber-100">
-            <Eye className="w-6 h-6" />
+          <div className="p-3 rounded-2xl bg-emerald-50 text-emerald-700 border border-emerald-100">
+            <Printer className="w-6 h-6" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-amber-600 uppercase tracking-wider">Module 6</span>
-              <Badge variant="warning" size="sm">Live Print Simulator</Badge>
+              <span className="text-xs font-bold text-emerald-700 uppercase tracking-wider">
+                Step 3: Preview & Print
+              </span>
+              <Badge variant="success" size="sm">
+                {totalPages} {totalPages === 1 ? 'A4 Page' : 'A4 Pages'}
+              </Badge>
               <Badge variant="info" size="sm">
-                {totalPages} {totalPages === 1 ? 'Page' : 'Pages'}
+                {paper.layout.orientation === 'landscape' ? 'Landscape' : 'Portrait'}
               </Badge>
             </div>
             <h1 className="text-xl sm:text-2xl font-bold text-slate-900 mt-0.5">
-              Live Paper Preview
+              Ready to Print or Export
             </h1>
             <p className="text-xs text-slate-500">
-              Interactive pagination simulator matching physical A4 paper dimensions and print boundaries.
+              High-resolution vector formatting ready for examination hall printing.
             </p>
           </div>
         </div>
 
+        {/* Action Buttons: Instant PDF, Word, and Excel */}
         <div className="flex flex-wrap items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => navigate(`/wizard?paperId=${paper.metadata.id}&step=3`)}
-            leftIcon={<Wand2 className="w-4 h-4 text-purple-600" />}
-          >
-            Setup Wizard
-          </Button>
-
           <Button
             variant="outline"
             size="sm"
             onClick={() => navigate(`/editor?paperId=${paper.metadata.id}`)}
             leftIcon={<FileEdit className="w-4 h-4 text-blue-600" />}
           >
-            Question Editor
-          </Button>
-
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => navigate(`/designer?paperId=${paper.metadata.id}`)}
-            leftIcon={<Palette className="w-4 h-4 text-pink-600" />}
-          >
-            Visual Designer
-          </Button>
-
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={handlePrint}
-            leftIcon={<Printer className="w-4 h-4" />}
-          >
-            Print / PDF
+            2. Edit Questions
           </Button>
 
           <Button
             variant="primary"
             size="sm"
-            onClick={() => navigate(`/export?paperId=${paper.metadata.id}`)}
-            leftIcon={<FileDown className="w-4 h-4" />}
+            onClick={handlePrint}
+            leftIcon={<Printer className="w-4 h-4" />}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold"
           >
-            Export
+            Print / Save PDF
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleDownloadDocx}
+            isLoading={downloadingFormat === 'docx'}
+            leftIcon={<FileDown className="w-4 h-4 text-blue-600" />}
+          >
+            Word (.docx)
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleDownloadXlsx}
+            isLoading={downloadingFormat === 'xlsx'}
+            leftIcon={<FileSpreadsheet className="w-4 h-4 text-emerald-600" />}
+          >
+            Excel (.xlsx)
+          </Button>
+
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => navigate(`/designer?paperId=${paper.metadata.id}`)}
+            leftIcon={<Palette className="w-4 h-4 text-pink-600" />}
+            title="Open Drag-and-drop Visual Designer"
+          >
+            Visual Designer
           </Button>
         </div>
       </div>
