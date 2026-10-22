@@ -34,5 +34,32 @@ export const storageService = {
       }
     }
     return JSON.stringify(data, null, 2)
+  },
+
+  // Import JSON backup into IndexedDB
+  async importBackup(jsonString: string): Promise<boolean> {
+    const db = await getDatabase()
+    const data = JSON.parse(jsonString)
+    if (!data.stores) throw new Error('Invalid backup file format')
+
+    const tx = db.transaction(['papers', 'exam_settings', 'paper_contents', 'visual_layouts', 'question_bank'], 'readwrite')
+    
+    if (Array.isArray(data.stores.papers)) {
+      for (const p of data.stores.papers) await tx.objectStore('papers').put(p)
+    }
+    if (Array.isArray(data.stores.exam_settings)) {
+      for (const s of data.stores.exam_settings) await tx.objectStore('exam_settings').put(s)
+    }
+    if (Array.isArray(data.stores.paper_contents)) {
+      for (const c of data.stores.paper_contents) await tx.objectStore('paper_contents').put(c)
+    }
+    if (Array.isArray(data.stores.visual_layouts)) {
+      for (const l of data.stores.visual_layouts) await tx.objectStore('visual_layouts').put(l)
+    }
+    if (Array.isArray(data.stores.question_bank)) {
+      for (const b of data.stores.question_bank) await tx.objectStore('question_bank').put(b)
+    }
+    await tx.done
+    return true
   }
 }
