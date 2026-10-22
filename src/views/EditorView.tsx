@@ -11,13 +11,17 @@ import {
   HelpCircle,
   ScanText,
   Mic,
-  ArrowRight
+  ArrowRight,
+  Save,
+  Bookmark
 } from 'lucide-react'
 import { usePaperDetails } from '../hooks/usePaperDetails'
 import { usePapers } from '../hooks/usePapers'
 import { Button } from '../components/common/Button'
 import { Badge } from '../components/common/Badge'
 import { WorkflowStepper } from '../components/common/WorkflowStepper'
+import { ChangeTemplateModal } from '../components/common/ChangeTemplateModal'
+import { SavePaperConfirmationModal } from '../components/common/SavePaperConfirmationModal'
 import { QuestionCard } from '../components/editor/QuestionCard'
 import { QuestionFormModal } from '../components/editor/QuestionFormModal'
 import { BulkImportModal } from '../components/editor/BulkImportModal'
@@ -35,7 +39,7 @@ export const EditorView: React.FC = () => {
   const { papers, loading: papersLoading } = usePapers()
 
   const paperId = searchParams.get('paperId') || (papers.length > 0 ? papers[0].id : '')
-  const { paper, loading: paperLoading, saveContent } = usePaperDetails(paperId)
+  const { paper, loading: paperLoading, saveContent, refresh } = usePaperDetails(paperId)
 
   // Synchronize paperId to URL if missing
   useEffect(() => {
@@ -56,6 +60,8 @@ export const EditorView: React.FC = () => {
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null)
   const [isBulkModalOpen, setIsBulkModalOpen] = useState(false)
   const [isBankModalOpen, setIsBankModalOpen] = useState(false)
+  const [isChangeTemplateOpen, setIsChangeTemplateOpen] = useState(false)
+  const [isSaveModalOpen, setIsSaveModalOpen] = useState(false)
   const [toastMessage, setToastMessage] = useState<string | null>(null)
 
   const showToast = (msg: string) => {
@@ -410,10 +416,33 @@ export const EditorView: React.FC = () => {
             type="button"
             variant="outline"
             size="sm"
+            onClick={() => setIsChangeTemplateOpen(true)}
+            leftIcon={<Bookmark className="w-4 h-4 text-purple-600" />}
+          >
+            Change Template
+          </Button>
+
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={async () => {
+              await persistSections(sections)
+              setIsSaveModalOpen(true)
+            }}
+            leftIcon={<Save className="w-4 h-4 text-emerald-600" />}
+          >
+            Save Paper
+          </Button>
+
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
             onClick={() => navigate(`/wizard?paperId=${paper.metadata.id}`)}
             leftIcon={<Wand2 className="w-4 h-4 text-slate-600" />}
           >
-            1. Edit Setup
+            Setup
           </Button>
 
           <Button
@@ -437,7 +466,7 @@ export const EditorView: React.FC = () => {
             rightIcon={<ArrowRight className="w-4 h-4" />}
             className="bg-emerald-600 text-white hover:bg-emerald-700 font-bold"
           >
-            3. Preview & Print
+            Preview & Print
           </Button>
         </div>
       </div>
@@ -788,6 +817,30 @@ export const EditorView: React.FC = () => {
           currentSectionId={currentSection?.sectionId || ''}
           defaultSubject={paper.settings.subject}
           defaultClass={paper.settings.className}
+        />
+      )}
+
+      {/* 4. Change Template Modal */}
+      {isChangeTemplateOpen && (
+        <ChangeTemplateModal
+          isOpen={isChangeTemplateOpen}
+          paperId={paper.metadata.id}
+          paperTitle={paper.metadata.title}
+          onClose={() => setIsChangeTemplateOpen(false)}
+          onApplied={() => {
+            refresh()
+            showToast('Template applied successfully!')
+          }}
+        />
+      )}
+
+      {/* 5. Save Paper Confirmation Modal */}
+      {isSaveModalOpen && (
+        <SavePaperConfirmationModal
+          isOpen={isSaveModalOpen}
+          paperId={paper.metadata.id}
+          paperTitle={paper.metadata.title}
+          onClose={() => setIsSaveModalOpen(false)}
         />
       )}
     </div>

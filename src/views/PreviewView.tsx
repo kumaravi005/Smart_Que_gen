@@ -14,13 +14,15 @@ import {
   ZoomIn,
   ZoomOut,
   Palette,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Bookmark
 } from 'lucide-react'
 import { usePaperDetails } from '../hooks/usePaperDetails'
 import { usePapers } from '../hooks/usePapers'
 import { Button } from '../components/common/Button'
 import { Badge } from '../components/common/Badge'
 import { WorkflowStepper } from '../components/common/WorkflowStepper'
+import { ChangeTemplateModal } from '../components/common/ChangeTemplateModal'
 import { PaperSheet } from '../components/preview/PaperSheet'
 import { paginatePaper } from '../utils/paginationEngine'
 import {
@@ -37,13 +39,14 @@ export const PreviewView: React.FC = () => {
   const { papers } = usePapers()
 
   const paperId = searchParams.get('paperId') || (papers.length > 0 ? papers[0].id : '')
-  const { paper, loading, saveLayout } = usePaperDetails(paperId)
+  const { paper, loading, saveLayout, refresh } = usePaperDetails(paperId)
 
   // View state
   const [activePageIndex, setActivePageIndex] = useState<number>(0)
   const [viewMode, setViewMode] = useState<'single' | 'all'>('single')
   const [zoomLevel, setZoomLevel] = useState<number>(100)
   const [isApplyingAdjustment, setIsApplyingAdjustment] = useState(false)
+  const [isChangeTemplateOpen, setIsChangeTemplateOpen] = useState(false)
 
   const [downloadingFormat, setDownloadingFormat] = useState<'docx' | 'xlsx' | null>(null)
 
@@ -202,6 +205,15 @@ export const PreviewView: React.FC = () => {
 
         {/* Action Buttons: Instant PDF, Word, and Excel */}
         <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setIsChangeTemplateOpen(true)}
+            leftIcon={<Bookmark className="w-4 h-4 text-purple-600" />}
+          >
+            Change Template
+          </Button>
+
           <Button
             variant="outline"
             size="sm"
@@ -477,6 +489,19 @@ export const PreviewView: React.FC = () => {
           ))
         )}
       </div>
+
+      {/* Change Template Modal */}
+      {isChangeTemplateOpen && (
+        <ChangeTemplateModal
+          isOpen={isChangeTemplateOpen}
+          paperId={paper.metadata.id}
+          paperTitle={paper.metadata.title}
+          onClose={() => setIsChangeTemplateOpen(false)}
+          onApplied={() => {
+            refresh()
+          }}
+        />
+      )}
     </div>
   )
 }

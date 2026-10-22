@@ -10,18 +10,18 @@ import {
   FileQuestion,
   Wand2,
   FileEdit,
-  Palette,
-  Eye,
-  FileDown,
   Wifi,
   WifiOff,
-  AlertCircle
+  AlertCircle,
+  Bookmark,
+  Printer
 } from 'lucide-react'
 import { usePapers } from '../hooks/usePapers'
 import { useNetworkStatus } from '../hooks/useNetworkStatus'
 import { storageService } from '../services/storageService'
 import { Button } from '../components/common/Button'
 import { Badge } from '../components/common/Badge'
+import { ChangeTemplateModal } from '../components/common/ChangeTemplateModal'
 import { formatRelativeTime } from '../utils/date'
 
 export const DraftsView: React.FC = () => {
@@ -33,6 +33,7 @@ export const DraftsView: React.FC = () => {
   const [backupRestoring, setBackupRestoring] = useState(false)
   const [statusMessage, setStatusMessage] = useState<string | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [templateModalPaper, setTemplateModalPaper] = useState<{ id: string; title: string } | null>(null)
 
   const handleDownloadBackup = async () => {
     try {
@@ -228,53 +229,49 @@ export const DraftsView: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Workflow Navigation Action Buttons */}
-                <div className="flex flex-wrap items-center gap-1.5 shrink-0">
+                {/* One-Click Action Buttons for this paper */}
+                <div className="flex flex-wrap items-center gap-2 shrink-0">
                   <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => navigate(`/wizard?paperId=${p.id}`)}
-                    title="Edit Examination Details & Setup"
-                    leftIcon={<Wand2 className="w-3.5 h-3.5 text-purple-600" />}
-                  >
-                    Setup
-                  </Button>
-                  <Button
-                    variant="outline"
+                    variant="primary"
                     size="sm"
                     onClick={() => navigate(`/editor?paperId=${p.id}`)}
-                    title="Smart Question Editor"
-                    leftIcon={<FileEdit className="w-3.5 h-3.5 text-blue-600" />}
+                    title="Edit or Add Questions"
+                    leftIcon={<FileEdit className="w-3.5 h-3.5" />}
                   >
-                    Editor
+                    Edit Questions
                   </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => navigate(`/designer?paperId=${p.id}`)}
-                    title="Visual Canvas Designer"
-                    leftIcon={<Palette className="w-3.5 h-3.5 text-pink-600" />}
-                  >
-                    Designer
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => navigate(`/preview?paperId=${p.id}`)}
-                    title="Live Print Preview"
-                    leftIcon={<Eye className="w-3.5 h-3.5 text-amber-600" />}
-                  >
-                    Preview
-                  </Button>
+
                   <Button
                     variant="secondary"
                     size="sm"
-                    onClick={() => navigate(`/export?paperId=${p.id}`)}
-                    title="Export Manager (PDF, DOCX, XLSX)"
-                    leftIcon={<FileDown className="w-3.5 h-3.5 text-rose-600" />}
+                    onClick={() => navigate(`/preview?paperId=${p.id}`)}
+                    title="Print or Export to PDF/Word/Excel"
+                    leftIcon={<Printer className="w-3.5 h-3.5 text-emerald-600" />}
+                    className="border-emerald-200 text-emerald-800 bg-emerald-50 hover:bg-emerald-100"
                   >
-                    Export
+                    Export / Print
                   </Button>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setTemplateModalPaper({ id: p.id, title: p.title })}
+                    title="Apply a different examination blueprint/layout"
+                    leftIcon={<Bookmark className="w-3.5 h-3.5 text-purple-600" />}
+                  >
+                    Change Template
+                  </Button>
+
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => navigate(`/wizard?paperId=${p.id}`)}
+                    title="Edit Exam Details & Instructions"
+                    leftIcon={<Wand2 className="w-3.5 h-3.5 text-slate-500" />}
+                  >
+                    Setup
+                  </Button>
+
                   <button
                     onClick={() => handleDelete(p.id, p.title)}
                     className="p-2 text-slate-400 hover:text-rose-600 rounded-xl hover:bg-rose-50 transition-colors"
@@ -288,6 +285,21 @@ export const DraftsView: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Change Template Modal */}
+      {templateModalPaper && (
+        <ChangeTemplateModal
+          isOpen={!!templateModalPaper}
+          onClose={() => setTemplateModalPaper(null)}
+          paperId={templateModalPaper.id}
+          paperTitle={templateModalPaper.title}
+          onApplied={async () => {
+            await refresh()
+            setStatusMessage(`Template updated successfully for "${templateModalPaper.title}"!`)
+            setTimeout(() => setStatusMessage(null), 4000)
+          }}
+        />
+      )}
     </div>
   )
 }
