@@ -311,7 +311,10 @@ export const paperService = {
       meta.className = settings.className
       meta.examName = settings.examName
       meta.totalMarks = settings.totalMarks
-      meta.title = `${settings.className} - ${settings.subject} ${settings.examName}`
+      // Preserve custom paper title if set; only set fallback if empty
+      if (!meta.title || meta.title.trim() === '') {
+        meta.title = `${settings.className} - ${settings.subject} ${settings.examName}`
+      }
       meta.updatedAt = settings.updatedAt
       await db.put('papers', meta)
     }
@@ -420,11 +423,27 @@ export const paperService = {
     if (!full) return
 
     const now = new Date().toISOString()
+    const {
+      subject: _tplSub,
+      className: _tplClass,
+      examName: _tplExam,
+      totalMarks: _tplMarks,
+      durationMinutes: _tplDur,
+      sections: _tplSec,
+      ...templateSettingsStyle
+    } = template.settings || {}
+
     const updatedSettings: ExamSettings = {
       ...full.settings,
-      ...template.settings,
+      ...templateSettingsStyle,
       id: full.settings.id,
       paperId,
+      subject: full.settings.subject,
+      className: full.settings.className,
+      examName: full.settings.examName,
+      totalMarks: full.settings.totalMarks,
+      durationMinutes: full.settings.durationMinutes,
+      sections: full.settings.sections,
       updatedAt: now
     }
 
