@@ -31,6 +31,7 @@ export interface Question {
   orderNumber: number
   type: QuestionType
   prompt: string // Supports rich text or markdown/LaTeX
+  instructions?: string // Optional per-question instruction (e.g. "Attempt in 30 words")
   options?: MCQOption[]
   matchPairs?: MatchPair[]
   marks: number
@@ -40,6 +41,11 @@ export interface Question {
   subtopic?: string
   hint?: string
   solutionText?: string
+  explanation?: string // Optional detailed explanation
+  answerKey?: string // Optional answer key (e.g. "B" or "74 degrees")
+  writingSpaceLines?: number // Optional answer-writing space lines in print output
+  customNumber?: string // Optional manual question number override
+  customLayoutMode?: 'auto' | 'four_per_row' | 'two_per_row' | 'one_per_row'
   orQuestionId?: string // Link to an alternative question for internal choice
   hasInternalChoice?: boolean
   diagramUrl?: string
