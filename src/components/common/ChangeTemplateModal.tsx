@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react'
 import { Modal } from './Modal'
 import { Button } from './Button'
+import { DeleteTemplateConfirmationModal } from './DeleteTemplateConfirmationModal'
 import { templateService } from '../../services/templateService'
 import { paperService } from '../../services/paperService'
 import type { PaperSetupTemplate } from '../../types'
-import { Bookmark, CheckCircle2 } from 'lucide-react'
+import { Bookmark, CheckCircle2, Trash2 } from 'lucide-react'
 
 interface ChangeTemplateModalProps {
   isOpen: boolean
@@ -26,6 +27,8 @@ export const ChangeTemplateModal: React.FC<ChangeTemplateModalProps> = ({
   const [loading, setLoading] = useState(false)
   const [isApplying, setIsApplying] = useState(false)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
+  const [templateToDelete, setTemplateToDelete] = useState<PaperSetupTemplate | null>(null)
+  const [isDeletingTemplate, setIsDeletingTemplate] = useState(false)
 
   useEffect(() => {
     if (isOpen) {
@@ -42,6 +45,24 @@ export const ChangeTemplateModal: React.FC<ChangeTemplateModalProps> = ({
         .finally(() => setLoading(false))
     }
   }, [isOpen])
+
+  const handleConfirmDelete = async (tpl: PaperSetupTemplate) => {
+    try {
+      setIsDeletingTemplate(true)
+      await templateService.deleteTemplate(tpl.id)
+      const list = await templateService.getAllTemplates()
+      setTemplates(list)
+      if (selectedTemplateId === tpl.id) {
+        setSelectedTemplateId(list.length > 0 ? list[0].id : '')
+      }
+      setTemplateToDelete(null)
+    } catch (err) {
+      console.error('Failed to delete template:', err)
+      alert('Could not delete template. Please try again.')
+    } finally {
+      setIsDeletingTemplate(false)
+    }
+  }
 
   const handleApply = async () => {
     if (!paperId || !selectedTemplateId) return
@@ -88,7 +109,9 @@ export const ChangeTemplateModal: React.FC<ChangeTemplateModalProps> = ({
               {loading ? (
                 <div className="p-8 text-center text-xs text-slate-400">Loading templates...</div>
               ) : templates.length === 0 ? (
-                <div className="p-6 text-center text-xs text-slate-500">No saved templates found.</div>
+                <div className="p-6 text-center text-xs text-slate-500 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                  No saved templates found.
+                </div>
               ) : (
                 templates.map(tpl => {
                   const isSelected = selectedTemplateId === tpl.id
@@ -102,7 +125,7 @@ export const ChangeTemplateModal: React.FC<ChangeTemplateModalProps> = ({
                           : 'bg-white border-slate-200 hover:border-slate-300'
                       }`}
                     >
-                      <div className="min-w-0">
+                      <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
                           <span className="font-bold text-xs sm:text-sm text-slate-900 truncate">
                             {tpl.name}
@@ -118,10 +141,25 @@ export const ChangeTemplateModal: React.FC<ChangeTemplateModalProps> = ({
                         )}
                       </div>
 
-                      <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 border ${
-                        isSelected ? 'border-purple-600 bg-purple-600 text-white' : 'border-slate-300'
-                      }`}>
-                        {isSelected && <CheckCircle2 className="w-3.5 h-3.5" />}
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setTemplateToDelete(tpl)
+                          }}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                          title={`Delete template "${tpl.name}"`}
+                          aria-label={`Delete template ${tpl.name}`}
+                        >
+                          <Trash2 className="w-4 h-4 stroke-[2]" />
+                        </button>
+
+                        <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 border ${
+                          isSelected ? 'border-purple-600 bg-purple-600 text-white' : 'border-slate-300'
+                        }`}>
+                          {isSelected && <CheckCircle2 className="w-3.5 h-3.5" />}
+                        </div>
                       </div>
                     </div>
                   )
@@ -148,6 +186,15 @@ export const ChangeTemplateModal: React.FC<ChangeTemplateModalProps> = ({
           </>
         )}
       </div>
+
+      {/* Delete Template Confirmation Modal with Danger Red Delete button */}
+      <DeleteTemplateConfirmationModal
+        isOpen={!!templateToDelete}
+        template={templateToDelete}
+        onClose={() => setTemplateToDelete(null)}
+        onConfirmDelete={handleConfirmDelete}
+        isDeleting={isDeletingTemplate}
+      />
     </Modal>
   )
 }

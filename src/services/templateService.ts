@@ -3,13 +3,17 @@ import type { PaperSetupTemplate, ExamSettings, VisualLayout } from '../types'
 import { generateId } from '../utils/id'
 
 export const templateService = {
-  // Get all templates (with auto-seeding if empty)
+  // Get all templates (with auto-seeding on initial setup only)
   async getAllTemplates(): Promise<PaperSetupTemplate[]> {
     const db = await getDatabase()
+    const seededRecord = await db.get('app_settings', 'templates_seeded')
+    const seeded = seededRecord?.value === true
     let list = await db.getAll('templates')
-    if (list.length === 0) {
+    if (!seeded && list.length === 0) {
       await this.seedDefaultTemplates()
       list = await db.getAll('templates')
+    } else if (!seeded && list.length > 0) {
+      await db.put('app_settings', { key: 'templates_seeded', value: true })
     }
     return list
   },
@@ -54,6 +58,7 @@ export const templateService = {
   // Seed default coaching center templates
   async seedDefaultTemplates(): Promise<void> {
     const db = await getDatabase()
+    await db.put('app_settings', { key: 'templates_seeded', value: true })
     const now = new Date().toISOString()
 
     const defaultInstitute = {

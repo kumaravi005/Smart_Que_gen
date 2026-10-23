@@ -262,5 +262,38 @@ describe('Paper Setup Wizard: Validation & Marks Calculations', () => {
 
     const deleted = await templateService.deleteTemplate(template.id)
     expect(deleted).toBe(true)
+
+    // Verify template is truly removed from all templates
+    const afterDelete = await templateService.getAllTemplates()
+    expect(afterDelete.some(t => t.id === template.id)).toBe(false)
+  })
+
+  it('permanently deletes specific templates without affecting others', async () => {
+    const tpl1 = await templateService.saveAsTemplate({
+      name: 'Template To Keep',
+      description: 'Keep this template',
+      settings: mockSettings,
+      layout: mockLayout
+    })
+    const tpl2 = await templateService.saveAsTemplate({
+      name: 'Template To Delete',
+      description: 'Delete this template',
+      settings: mockSettings,
+      layout: mockLayout
+    })
+
+    const initialList = await templateService.getAllTemplates()
+    expect(initialList.some(t => t.id === tpl1.id)).toBe(true)
+    expect(initialList.some(t => t.id === tpl2.id)).toBe(true)
+
+    // Delete tpl2
+    await templateService.deleteTemplate(tpl2.id)
+
+    const updatedList = await templateService.getAllTemplates()
+    expect(updatedList.some(t => t.id === tpl1.id)).toBe(true)
+    expect(updatedList.some(t => t.id === tpl2.id)).toBe(false)
+
+    // Clean up tpl1
+    await templateService.deleteTemplate(tpl1.id)
   })
 })

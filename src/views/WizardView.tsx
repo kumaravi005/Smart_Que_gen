@@ -6,7 +6,8 @@ import {
   ArrowRight,
   CheckCircle2,
   AlertCircle,
-  Sparkles
+  Sparkles,
+  Trash2
 } from 'lucide-react'
 import { usePaperDetails } from '../hooks/usePaperDetails'
 import { usePapers } from '../hooks/usePapers'
@@ -22,6 +23,7 @@ import { Step4Instructions } from '../components/wizard/Step4Instructions'
 import { Step5HeaderFooter } from '../components/wizard/Step5HeaderFooter'
 import { Step6McqLayout } from '../components/wizard/Step6McqLayout'
 import { Step7Review } from '../components/wizard/Step7Review'
+import { DeleteTemplateConfirmationModal } from '../components/common/DeleteTemplateConfirmationModal'
 import { validateStep1, validateStep2, validateStep3 } from '../utils/wizardValidation'
 import type { ExamSettings, VisualLayout, PaperSetupTemplate } from '../types'
 
@@ -54,6 +56,8 @@ export const WizardView: React.FC = () => {
   const [autoSaveStatus, setAutoSaveStatus] = useState<string>('Saved locally')
   const [templates, setTemplates] = useState<PaperSetupTemplate[]>([])
   const [showTemplatesModal, setShowTemplatesModal] = useState(false)
+  const [templateToDelete, setTemplateToDelete] = useState<PaperSetupTemplate | null>(null)
+  const [isDeletingTemplate, setIsDeletingTemplate] = useState(false)
 
   const { paper, loading, refresh: refreshDetails } = usePaperDetails(paperId)
 
@@ -226,6 +230,22 @@ export const WizardView: React.FC = () => {
     } catch (err) {
       console.error(err)
       alert('Failed to apply template.')
+    }
+  }
+
+  // Confirm delete template
+  const handleConfirmDeleteTemplate = async (template: PaperSetupTemplate) => {
+    try {
+      setIsDeletingTemplate(true)
+      await templateService.deleteTemplate(template.id)
+      const list = await templateService.getAllTemplates()
+      setTemplates(list)
+      setTemplateToDelete(null)
+    } catch (err) {
+      console.error('Failed to delete template:', err)
+      alert('Could not delete template. Please try again.')
+    } finally {
+      setIsDeletingTemplate(false)
     }
   }
 
@@ -489,31 +509,51 @@ export const WizardView: React.FC = () => {
               </button>
             </div>
 
-            <div className="space-y-2.5 max-h-80 overflow-y-auto">
-              {templates.map(tpl => (
-                <div
-                  key={tpl.id}
-                  className="p-4 rounded-2xl border border-slate-200 hover:border-blue-400 bg-slate-50/50 hover:bg-blue-50/30 transition-all flex items-center justify-between gap-3"
-                >
-                  <div className="space-y-1">
-                    <h4 className="font-bold text-sm text-slate-900">{tpl.name}</h4>
-                    {tpl.description && <p className="text-xs text-slate-500">{tpl.description}</p>}
-                    <div className="flex items-center gap-2 text-[11px] text-slate-500">
-                      <span>{tpl.subject} ({tpl.className})</span>
-                      <span>•</span>
-                      <span>{tpl.totalMarks} Marks</span>
+            <div className="space-y-2.5 max-h-80 overflow-y-auto pr-1">
+              {templates.length === 0 ? (
+                <div className="p-8 text-center text-xs text-slate-500 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                  No saved templates found.
+                </div>
+              ) : (
+                templates.map(tpl => (
+                  <div
+                    key={tpl.id}
+                    className="p-4 rounded-2xl border border-slate-200 hover:border-blue-400 bg-slate-50/50 hover:bg-blue-50/30 transition-all flex items-center justify-between gap-3"
+                  >
+                    <div className="space-y-1 min-w-0 flex-1">
+                      <h4 className="font-bold text-sm text-slate-900 truncate">{tpl.name}</h4>
+                      {tpl.description && <p className="text-xs text-slate-500 line-clamp-2">{tpl.description}</p>}
+                      <div className="flex items-center gap-2 text-[11px] text-slate-500">
+                        <span>{tpl.subject} ({tpl.className})</span>
+                        <span>•</span>
+                        <span>{tpl.totalMarks} Marks</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        onClick={() => handleApplyTemplate(tpl)}
+                      >
+                        Apply
+                      </Button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setTemplateToDelete(tpl)
+                        }}
+                        className="p-2 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 border border-slate-200 hover:border-rose-200 transition-colors"
+                        title={`Delete template "${tpl.name}"`}
+                        aria-label={`Delete template ${tpl.name}`}
+                      >
+                        <Trash2 className="w-4 h-4 stroke-[2]" />
+                      </button>
                     </div>
                   </div>
-
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    onClick={() => handleApplyTemplate(tpl)}
-                  >
-                    Apply
-                  </Button>
-                </div>
-              ))}
+                ))
+              )}
             </div>
 
             <div className="flex justify-end pt-2 border-t border-slate-100">
@@ -524,6 +564,15 @@ export const WizardView: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Delete Template Confirmation Modal */}
+      <DeleteTemplateConfirmationModal
+        isOpen={!!templateToDelete}
+        template={templateToDelete}
+        onClose={() => setTemplateToDelete(null)}
+        onConfirmDelete={handleConfirmDeleteTemplate}
+        isDeleting={isDeletingTemplate}
+      />
     </div>
   )
 }
