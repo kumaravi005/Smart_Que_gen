@@ -1,5 +1,5 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb'
-import type { PaperMetadata, ExamSettings, PaperContent, VisualLayout, QuestionBankItem, PaperSetupTemplate } from '../types'
+import type { PaperMetadata, ExamSettings, PaperContent, VisualLayout, QuestionBankItem, PaperSetupTemplate, BankFolder } from '../types'
 import { generateId } from '../utils/id'
 
 export interface OmegaDB extends DBSchema {
@@ -49,6 +49,13 @@ export interface OmegaDB extends DBSchema {
       'by-subject': string
     }
   }
+  bank_folders: {
+    key: string
+    value: BankFolder
+    indexes: {
+      'by-parent': string
+    }
+  }
   app_settings: {
     key: string
     value: any
@@ -56,7 +63,7 @@ export interface OmegaDB extends DBSchema {
 }
 
 const DB_NAME = 'omega_paper_gen_db'
-const DB_VERSION = 2
+const DB_VERSION = 3
 
 let dbPromise: Promise<IDBPDatabase<OmegaDB>> | null = null
 
@@ -104,7 +111,13 @@ export function getDatabase(): Promise<IDBPDatabase<OmegaDB>> {
           templateStore.createIndex('by-subject', 'subject')
         }
 
-        // 7. App Settings Store
+        // 7. Bank Folders Store
+        if (!db.objectStoreNames.contains('bank_folders')) {
+          const folderStore = db.createObjectStore('bank_folders', { keyPath: 'id' })
+          folderStore.createIndex('by-parent', 'parentId')
+        }
+
+        // 8. App Settings Store
         if (!db.objectStoreNames.contains('app_settings')) {
           db.createObjectStore('app_settings', { keyPath: 'key' })
         }
@@ -113,6 +126,7 @@ export function getDatabase(): Promise<IDBPDatabase<OmegaDB>> {
   }
   return dbPromise
 }
+
 
 // Seed sample data if database is empty on first boot
 export async function seedInitialDataIfEmpty(): Promise<void> {

@@ -77,4 +77,55 @@ Q10. Final question 10.
     expect(warnings.some(w => w.includes('LaTeX'))).toBe(true)
     expect(warnings.some(w => w.includes('parentheses'))).toBe(true)
   })
+
+  it('correctly parses Hindi bilingual MCQs with bullet points without embedding options in prompt', () => {
+    const rawHindiText = `
+Q20. किसी वृत्त पर बाह्य बिन्दु से कितनी स्पर्श रेखाएँ खींची जा सकती हैं?
+(How many tangents can be drawn from an external point to a circle?)
+o (A) 1
+o (B) 2
+o (C) अनंत (Infinite)
+o (D) 0
+    `
+    const questions = parseOcrQuestions(rawHindiText)
+    expect(questions.length).toBe(1)
+
+    const q = questions[0]
+    expect(q.detectedNumber).toBe('20')
+    expect(q.type).toBe('mcq')
+    expect(q.marks).toBe(1)
+    expect(q.prompt).toContain('किसी वृत्त पर बाह्य बिन्दु से कितनी स्पर्श रेखाएँ खींची जा सकती हैं?')
+    expect(q.prompt).toContain('(How many tangents can be drawn from an external point to a circle?)')
+    // Crucial check: Prompt must not have the options mashed inside it!
+    expect(q.prompt).not.toContain('o (A) 1')
+    expect(q.options?.length).toBe(4)
+    expect(q.options?.[0].label).toBe('A')
+    expect(q.options?.[0].text).toBe('1')
+    expect(q.options?.[1].label).toBe('B')
+    expect(q.options?.[1].text).toBe('2')
+    expect(q.options?.[2].label).toBe('C')
+    expect(q.options?.[2].text).toBe('अनंत (Infinite)')
+    expect(q.options?.[3].label).toBe('D')
+    expect(q.options?.[3].text).toBe('0')
+  })
+
+  it('parses inline MCQ options and Devanagari question prefixes and labels', () => {
+    const rawInline = `
+प्रश्न 15. प्रकाश के वेग का मान निर्वात में क्या है? [1 अंक]
+(क) 3x10^8 m/s (ख) 2x10^8 m/s (ग) 1.5x10^8 m/s (घ) शून्य
+    `
+    const questions = parseOcrQuestions(rawInline)
+    expect(questions.length).toBe(1)
+
+    const q = questions[0]
+    expect(q.detectedNumber).toBe('15')
+    expect(q.type).toBe('mcq')
+    expect(q.marks).toBe(1)
+    expect(q.options?.length).toBe(4)
+    expect(q.options?.[0].label).toBe('A')
+    expect(q.options?.[0].text).toContain('3x10^8 m/s')
+    expect(q.options?.[3].label).toBe('D')
+    expect(q.options?.[3].text).toBe('शून्य')
+  })
 })
+

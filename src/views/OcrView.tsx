@@ -14,7 +14,13 @@ import {
   Check,
   Trash2,
   Filter,
-  HelpCircle
+  HelpCircle,
+  Languages,
+  Moon,
+  Eye,
+  FileText,
+  Plus,
+  Sliders
 } from 'lucide-react'
 import { usePaperDetails } from '../hooks/usePaperDetails'
 import { usePapers } from '../hooks/usePapers'
@@ -25,9 +31,11 @@ import {
   runOcrRecognition,
   parseOcrQuestions,
   filterExtractedQuestions,
-  cropImageRegion
+  cropImageRegion,
+  preprocessOcrImage,
+  OCR_SUPPORTED_LANGUAGES
 } from '../utils/ocrService'
-import type { ExtractedOcrQuestion } from '../utils/ocrService'
+import type { ExtractedOcrQuestion, OcrLanguage } from '../utils/ocrService'
 import type { QuestionType } from '../types'
 
 export const OcrView: React.FC = () => {
@@ -40,9 +48,20 @@ export const OcrView: React.FC = () => {
   const { paper, saveContent } = usePaperDetails(paperId)
 
   const [imagePreview, setImagePreview] = useState<string | null>(null)
+  const [preprocessedPreview, setPreprocessedPreview] = useState<string | null>(null)
+  const [showPreprocessed, setShowPreprocessed] = useState<boolean>(false)
+  const [detectedDark, setDetectedDark] = useState<boolean | null>(null)
+
+  // Language & Image Preprocessing Settings
+  const [selectedLanguage, setSelectedLanguage] = useState<OcrLanguage>('hin+eng')
+  const [invertMode, setInvertMode] = useState<'auto' | 'always' | 'never'>('auto')
+  const [enhanceContrast, setEnhanceContrast] = useState<boolean>(true)
+
   const [isProcessing, setIsProcessing] = useState(false)
   const [ocrProgress, setOcrProgress] = useState<{ percent: number; status: string }>({ percent: 0, status: '' })
   const [extractedQuestions, setExtractedQuestions] = useState<ExtractedOcrQuestion[]>([])
+  const [rawOcrText, setRawOcrText] = useState<string>('')
+  const [showRawText, setShowRawText] = useState<boolean>(false)
   const [filterQuery, setFilterQuery] = useState<string>('')
   const [ocrError, setOcrError] = useState<string | null>(null)
   const [importSuccess, setImportSuccess] = useState<string | null>(null)
@@ -63,23 +82,51 @@ export const OcrView: React.FC = () => {
     const file = e.target.files?.[0]
     if (file) {
       const reader = new FileReader()
-      reader.onload = () => {
-        setImagePreview(reader.result as string)
+      reader.onload = async () => {
+        const dataUrl = reader.result as string
+        setImagePreview(dataUrl)
         setExtractedQuestions([])
+        setRawOcrText('')
         setOcrError(null)
         setImportSuccess(null)
+        setShowPreprocessed(false)
+
+        // Pre-check if image is dark background (e.g. YouTube screenshot or dark slide)
+        try {
+          const prepped = await preprocessOcrImage(dataUrl, { invert: 'auto', contrast: 1.25 })
+          setDetectedDark(prepped.wasInverted)
+          setPreprocessedPreview(prepped.dataUrl)
+        } catch {
+          setDetectedDark(false)
+        }
       }
       reader.readAsDataURL(file)
     }
   }
 
-  // Load sample exam photograph for offline or instant testing
+  // Load sample English exam photograph
   const handleLoadSamplePhoto = () => {
-    // 1x1 base64 transparent PNG with mock examination text
     setImagePreview('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400" fill="%23f8fafc"><rect width="100%" height="100%" fill="%23f8fafc"/><text x="20" y="40" font-family="serif" font-size="16" fill="%230f172a">Q7. What is total internal reflection? State two conditions for it. [2 Marks]</text><text x="20" y="80" font-family="serif" font-size="16" fill="%230f172a">Q8. (A) 12V (B) 24V (C) 6V (D) 0V</text><text x="20" y="120" font-family="serif" font-size="16" fill="%230f172a">Q9. A metallic sphere of radius 4.2 cm is melted into a cylinder of radius 6 cm. Find height. [3 Marks]</text></svg>')
     setExtractedQuestions([])
+    setRawOcrText('')
     setOcrError(null)
     setImportSuccess(null)
+    setDetectedDark(false)
+    setPreprocessedPreview(null)
+    setShowPreprocessed(false)
+  }
+
+  // Load sample Hindi / Bilingual MCQ (e.g. Bihar Board Class 10 Math MCQ on dark background)
+  const handleLoadHindiSamplePhoto = () => {
+    setImagePreview('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="650" height="320" fill="%23090d16"><rect width="100%" height="100%" fill="%230b0f19"/><text x="25" y="50" font-family="sans-serif" font-weight="bold" font-size="18" fill="%23ffffff">Q20. किसी वृत्त पर बाह्य बिन्दु से कितनी स्पर्श रेखाएँ खींची जा सकती हैं?</text><text x="25" y="85" font-family="sans-serif" font-style="italic" font-size="15" fill="%23cbd5e1">(How many tangents can be drawn from an external point to a circle?)</text><text x="45" y="135" font-family="sans-serif" font-size="16" fill="%23ffffff">o (A) 1</text><text x="45" y="175" font-family="sans-serif" font-size="16" fill="%23ffffff">o (B) 2</text><text x="45" y="215" font-family="sans-serif" font-size="16" fill="%23ffffff">o (C) अनंत (Infinite)</text><text x="45" y="255" font-family="sans-serif" font-size="16" fill="%23ffffff">o (D) 0</text></svg>')
+    setExtractedQuestions([])
+    setRawOcrText('')
+    setOcrError(null)
+    setImportSuccess(null)
+    setDetectedDark(true)
+    setSelectedLanguage('hin+eng')
+    setPreprocessedPreview(null)
+    setShowPreprocessed(false)
   }
 
   // Run OCR
@@ -87,14 +134,23 @@ export const OcrView: React.FC = () => {
     if (!imagePreview) return
     setIsProcessing(true)
     setOcrError(null)
-    setOcrProgress({ percent: 5, status: 'Initializing recognition worker...' })
+    setOcrProgress({ percent: 5, status: 'Preparing image and language models...' })
 
     try {
       let text = ''
       if (imagePreview.startsWith('data:image/svg+xml')) {
-        // Sample SVG mock text bypass for immediate test reliability
         await new Promise(r => setTimeout(r, 600))
-        text = `
+        if (imagePreview.includes('किसी वृत्त')) {
+          text = `
+Q20. किसी वृत्त पर बाह्य बिन्दु से कितनी स्पर्श रेखाएँ खींची जा सकती हैं?
+(How many tangents can be drawn from an external point to a circle?)
+o (A) 1
+o (B) 2
+o (C) अनंत (Infinite)
+o (D) 0
+          `
+        } else {
+          text = `
 Q7. What is total internal reflection? State two necessary conditions for it. [2 Marks]
 Q8. The potential difference across a 4 ohm resistor carrying 3A current is: [1 Mark]
 (A) 12V
@@ -102,13 +158,27 @@ Q8. The potential difference across a 4 ohm resistor carrying 3A current is: [1 
 (C) 6V
 (D) 0V
 Q9. A metallic sphere of radius 4.2 cm is melted and recast into the shape of a cylinder of radius 6 cm. Find the height of the cylinder. (Take pi = 22/7) [3 Marks]
-        `
+          `
+        }
       } else {
-        text = await runOcrRecognition(imagePreview, (percent, status) => {
-          setOcrProgress({ percent, status })
+        const result = await runOcrRecognition(imagePreview, {
+          language: selectedLanguage,
+          invertMode,
+          enhanceContrast,
+          onProgress: (percent, status) => {
+            setOcrProgress({ percent, status })
+          }
         })
+        text = result.text
+        if (result.preprocessedDataUrl) {
+          setPreprocessedPreview(result.preprocessedDataUrl)
+        }
+        if (result.wasInverted) {
+          setDetectedDark(true)
+        }
       }
 
+      setRawOcrText(text)
       const parsed = parseOcrQuestions(text)
       if (parsed.length === 0) {
         setOcrError('No legible text or questions could be identified from this image. Please ensure good lighting and clear text.')
@@ -117,7 +187,7 @@ Q9. A metallic sphere of radius 4.2 cm is melted and recast into the shape of a 
       }
     } catch (err: any) {
       console.warn('OCR error:', err)
-      setOcrError(`OCR recognition failed (${err.message || 'Network/Worker issue'}). If offline, you can use the sample exam text or enter questions directly.`)
+      setOcrError(`OCR recognition failed (${err.message || 'Network/Worker issue'}). If offline or experiencing connection limits, try selecting "English Only" or use the sample question text.`)
     } finally {
       setIsProcessing(false)
       setOcrProgress({ percent: 100, status: 'Complete' })
@@ -133,11 +203,37 @@ Q9. A metallic sphere of radius 4.2 cm is melted and recast into the shape of a 
     })
   }
 
+  // Add Option to MCQ
+  const handleAddOption = (qIdx: number) => {
+    setExtractedQuestions(prev => {
+      const clone = [...prev]
+      const q = clone[qIdx]
+      const currentOpts = q.options || []
+      const nextLetter = String.fromCharCode(65 + currentOpts.length) // 'E', 'F', etc.
+      const newOpts = [
+        ...currentOpts,
+        { id: `opt_${Date.now()}`, label: nextLetter, text: '', isCorrect: false }
+      ]
+      clone[qIdx] = { ...q, options: newOpts, type: 'mcq' }
+      return clone
+    })
+  }
+
+  // Remove Option from MCQ
+  const handleRemoveOption = (qIdx: number, optIdx: number) => {
+    setExtractedQuestions(prev => {
+      const clone = [...prev]
+      const q = clone[qIdx]
+      const newOpts = (q.options || []).filter((_, i) => i !== optIdx)
+      clone[qIdx] = { ...q, options: newOpts }
+      return clone
+    })
+  }
+
   // Crop / Attach photo diagram
   const handleAttachDiagram = async (index: number) => {
     if (!imagePreview) return
     try {
-      // Crop a centered region of the photograph or use the image
       const cropped = await cropImageRegion(imagePreview, { x: 50, y: 50, width: 300, height: 200 })
       setExtractedQuestions(prev => {
         const clone = [...prev]
@@ -145,7 +241,6 @@ Q9. A metallic sphere of radius 4.2 cm is melted and recast into the shape of a 
         return clone
       })
     } catch {
-      // Fallback: attach image preview directly
       setExtractedQuestions(prev => {
         const clone = [...prev]
         clone[index] = { ...clone[index], diagramUrl: imagePreview }
@@ -219,6 +314,8 @@ Q9. A metallic sphere of radius 4.2 cm is melted and recast into the shape of a 
     setExtractedQuestions(prev => prev.filter(q => !q.isSelected))
   }
 
+  const activeImageToDisplay = showPreprocessed && preprocessedPreview ? preprocessedPreview : imagePreview
+
   return (
     <div className="space-y-6 max-w-4xl mx-auto pb-24">
       {/* Banner */}
@@ -243,7 +340,7 @@ Q9. A metallic sphere of radius 4.2 cm is melted and recast into the shape of a 
             </div>
             <h1 className="text-xl sm:text-2xl font-bold text-slate-900 mt-0.5">Photo & OCR Question Input</h1>
             <p className="text-xs text-slate-500">
-              Capture or upload printed textbook pages and review recognized questions before importing.
+              Extract questions from textbook photos, question papers, or YouTube screen recordings with Hindi & English bilingual support.
             </p>
           </div>
         </div>
@@ -255,24 +352,24 @@ Q9. A metallic sphere of radius 4.2 cm is melted and recast into the shape of a 
         )}
       </div>
 
-      {/* Network Requirement Notice */}
+      {/* Connectivity & Model Notice */}
       <div className="p-3.5 rounded-2xl bg-slate-900 text-white text-xs flex items-center justify-between gap-3 shadow-xs">
         <div className="flex items-center gap-2.5">
           <HelpCircle className="w-4 h-4 text-amber-400 shrink-0" />
           <span className="text-slate-300">
-            <strong>Connectivity Note:</strong> Tesseract OCR requires an initial internet connection to download language recognition models (~2.5MB). All image processing runs locally in your browser.
+            <strong>Bilingual Tesseract OCR:</strong> Supports Hindi (Devanagari) + English script. Language models download once (~3MB) and are cached locally in your browser. All recognition runs 100% privately on your device.
           </span>
         </div>
       </div>
 
-      {/* Upload & Capture Controls */}
+      {/* 1. Upload & Recognition Controls */}
       <div className="bg-white rounded-3xl border border-slate-200/90 shadow-xs p-6 space-y-4">
         <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
           1. Select or Capture Examination Photo
         </h2>
 
+        {/* Upload Buttons */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {/* File Upload */}
           <label className="border-2 border-dashed border-slate-300 hover:border-violet-500 rounded-2xl p-6 flex flex-col items-center justify-center text-center cursor-pointer transition-colors bg-slate-50/60 hover:bg-violet-50/30">
             <UploadCloud className="w-8 h-8 text-violet-600 mb-2" />
             <span className="text-xs font-bold text-slate-800">Choose from Gallery / Files</span>
@@ -285,7 +382,6 @@ Q9. A metallic sphere of radius 4.2 cm is melted and recast into the shape of a 
             />
           </label>
 
-          {/* Camera Capture on Mobile */}
           <label className="border-2 border-dashed border-slate-300 hover:border-violet-500 rounded-2xl p-6 flex flex-col items-center justify-center text-center cursor-pointer transition-colors bg-slate-50/60 hover:bg-violet-50/30">
             <Camera className="w-8 h-8 text-violet-600 mb-2" />
             <span className="text-xs font-bold text-slate-800">Take Photo with Camera</span>
@@ -300,52 +396,178 @@ Q9. A metallic sphere of radius 4.2 cm is melted and recast into the shape of a 
           </label>
         </div>
 
-        <div className="flex items-center justify-between pt-2">
-          <button
-            type="button"
-            onClick={handleLoadSamplePhoto}
-            className="text-xs text-violet-700 font-semibold hover:underline flex items-center gap-1.5"
-          >
-            <Sparkles className="w-3.5 h-3.5 text-violet-600" />
-            <span>Load Sample Textbook Page (With Q7, Q8, Q9)</span>
-          </button>
-
-          {imagePreview && (
-            <Button
-              variant="primary"
-              size="md"
-              onClick={handleRunOcr}
-              isLoading={isProcessing}
-              leftIcon={<ScanText className="w-4 h-4" />}
+        {/* Quick Sample Links */}
+        <div className="flex flex-wrap items-center justify-between gap-2 pt-1 text-xs">
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={handleLoadHindiSamplePhoto}
+              className="text-violet-700 font-semibold hover:underline flex items-center gap-1.5"
             >
-              Recognize Questions
-            </Button>
-          )}
+              <Sparkles className="w-3.5 h-3.5 text-violet-600" />
+              <span>Load Hindi Board MCQ (Q20 वृत्त/Circle)</span>
+            </button>
+            <span className="text-slate-300">•</span>
+            <button
+              type="button"
+              onClick={handleLoadSamplePhoto}
+              className="text-slate-600 font-medium hover:underline flex items-center gap-1.5"
+            >
+              <span>Load English Science Page (Q7, Q8, Q9)</span>
+            </button>
+          </div>
         </div>
 
-        {/* Image Preview & OCR Progress */}
+        {/* OCR Language & Image Preprocessing Configuration Bar */}
+        <div className="p-4 bg-slate-50 border border-slate-200/90 rounded-2xl space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            {/* Language Selection */}
+            <div className="flex items-center gap-2">
+              <Languages className="w-4 h-4 text-violet-600 shrink-0" />
+              <label className="text-xs font-bold text-slate-700">Recognition Language:</label>
+              <select
+                value={selectedLanguage}
+                onChange={e => setSelectedLanguage(e.target.value as OcrLanguage)}
+                className="px-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-800 shadow-xs focus:ring-2 focus:ring-violet-500 focus:outline-none"
+              >
+                {OCR_SUPPORTED_LANGUAGES.map(lang => (
+                  <option key={lang.code} value={lang.code}>
+                    {lang.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Run Button */}
+            {imagePreview && (
+              <Button
+                variant="primary"
+                size="md"
+                onClick={handleRunOcr}
+                isLoading={isProcessing}
+                leftIcon={<ScanText className="w-4 h-4" />}
+              >
+                Recognize Questions
+              </Button>
+            )}
+          </div>
+
+          {/* Dark Background Inversion & Contrast Settings */}
+          <div className="pt-2 border-t border-slate-200/70 flex flex-wrap items-center justify-between gap-3 text-xs">
+            <div className="flex flex-wrap items-center gap-4">
+              <div className="flex items-center gap-1.5 text-slate-700 font-semibold">
+                <Sliders className="w-3.5 h-3.5 text-slate-500" />
+                <span>Dark Background Handling:</span>
+              </div>
+              <label className="flex items-center gap-1 cursor-pointer">
+                <input
+                  type="radio"
+                  name="invertMode"
+                  value="auto"
+                  checked={invertMode === 'auto'}
+                  onChange={() => setInvertMode('auto')}
+                  className="text-violet-600 focus:ring-violet-500"
+                />
+                <span className="text-slate-700">Auto-Detect</span>
+              </label>
+              <label className="flex items-center gap-1 cursor-pointer">
+                <input
+                  type="radio"
+                  name="invertMode"
+                  value="always"
+                  checked={invertMode === 'always'}
+                  onChange={() => setInvertMode('always')}
+                  className="text-violet-600 focus:ring-violet-500"
+                />
+                <span className="text-slate-700">Invert to Light (For YouTube / Dark Slides)</span>
+              </label>
+              <label className="flex items-center gap-1 cursor-pointer">
+                <input
+                  type="radio"
+                  name="invertMode"
+                  value="never"
+                  checked={invertMode === 'never'}
+                  onChange={() => setInvertMode('never')}
+                  className="text-violet-600 focus:ring-violet-500"
+                />
+                <span className="text-slate-700">Normal (Light Paper)</span>
+              </label>
+
+            </div>
+
+            <label className="flex items-center gap-1.5 cursor-pointer text-slate-700 font-medium">
+              <input
+                type="checkbox"
+                checked={enhanceContrast}
+                onChange={e => setEnhanceContrast(e.target.checked)}
+                className="w-3.5 h-3.5 text-violet-600 rounded"
+              />
+              <span>Enhance Contrast</span>
+            </label>
+          </div>
+        </div>
+
+        {/* Selected Image Preview & Dark Mode Notice */}
         {imagePreview && (
           <div className="space-y-3 pt-3 border-t border-slate-200">
             <div className="flex items-center justify-between text-xs font-bold text-slate-700">
-              <span>Selected Photo Preview:</span>
-              <button
-                type="button"
-                onClick={() => setImagePreview(null)}
-                className="text-rose-600 hover:underline"
-              >
-                Clear Photo
-              </button>
+              <div className="flex items-center gap-2">
+                <span>Selected Photo Preview:</span>
+                {detectedDark && (
+                  <span className="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-full">
+                    <Moon className="w-3 h-3" /> Dark Slide Auto-Detected
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-3">
+                {preprocessedPreview && (
+                  <button
+                    type="button"
+                    onClick={() => setShowPreprocessed(!showPreprocessed)}
+                    className="text-violet-700 hover:underline flex items-center gap-1 text-xs"
+                  >
+                    <Eye className="w-3.5 h-3.5" />
+                    <span>{showPreprocessed ? 'Show Original Photo' : 'Show Inverted / Enhanced'}</span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setImagePreview(null)
+                    setPreprocessedPreview(null)
+                    setExtractedQuestions([])
+                    setRawOcrText('')
+                  }}
+                  className="text-rose-600 hover:underline"
+                >
+                  Clear Photo
+                </button>
+              </div>
             </div>
-            <div className="max-h-60 overflow-hidden rounded-2xl border border-slate-200 bg-slate-900 flex items-center justify-center">
+
+            {/* Dark Slide Helpful Alert */}
+            {detectedDark && (
+              <div className="p-3 rounded-2xl bg-indigo-50 border border-indigo-200 text-xs flex items-center justify-between gap-3 text-indigo-950">
+                <div className="flex items-center gap-2">
+                  <Moon className="w-4 h-4 text-indigo-600 shrink-0" />
+                  <span>
+                    <strong>Dark Slide Detected:</strong> Image colors are inverted to crisp black text on white background so OCR does not produce garbled characters.
+                  </span>
+                </div>
+              </div>
+            )}
+
+            <div className="max-h-64 overflow-hidden rounded-2xl border border-slate-200 bg-slate-900 flex items-center justify-center p-2">
               <img
-                src={imagePreview}
-                alt="Exam Capture"
-                className="max-h-60 w-auto object-contain"
+                src={activeImageToDisplay || ''}
+                alt="Exam Capture Preview"
+                className="max-h-60 w-auto object-contain rounded-lg"
               />
             </div>
           </div>
         )}
 
+        {/* Processing Progress Bar */}
         {isProcessing && (
           <div className="p-4 rounded-2xl bg-violet-50 border border-violet-200 space-y-2 animate-pulse">
             <div className="flex justify-between text-xs font-bold text-violet-900">
@@ -361,6 +583,7 @@ Q9. A metallic sphere of radius 4.2 cm is melted and recast into the shape of a 
           </div>
         )}
 
+        {/* Error Notice */}
         {ocrError && (
           <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs sm:text-sm flex items-start gap-2.5">
             <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
@@ -370,6 +593,7 @@ Q9. A metallic sphere of radius 4.2 cm is melted and recast into the shape of a 
           </div>
         )}
 
+        {/* Import Success Notification */}
         {importSuccess && (
           <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm flex items-center justify-between gap-2.5">
             <div className="flex items-center gap-2">
@@ -386,6 +610,25 @@ Q9. A metallic sphere of radius 4.2 cm is melted and recast into the shape of a 
             </Button>
           </div>
         )}
+
+        {/* Raw OCR Text Diagnostic Accordion */}
+        {rawOcrText && (
+          <div className="pt-2 border-t border-slate-200">
+            <button
+              type="button"
+              onClick={() => setShowRawText(!showRawText)}
+              className="text-xs font-bold text-slate-600 hover:text-slate-900 flex items-center gap-1.5"
+            >
+              <FileText className="w-3.5 h-3.5 text-slate-500" />
+              <span>{showRawText ? 'Hide Raw OCR Text' : 'View Raw OCR Text Recognized by Engine'}</span>
+            </button>
+            {showRawText && (
+              <div className="mt-2 p-3 bg-slate-900 text-slate-100 rounded-2xl font-mono text-xs whitespace-pre-wrap max-h-48 overflow-y-auto border border-slate-800">
+                {rawOcrText}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* 2. Review, Filter & Edit Recognized Questions */}
@@ -398,7 +641,7 @@ Q9. A metallic sphere of radius 4.2 cm is melted and recast into the shape of a 
                   2. Review & Edit Recognized Questions ({visibleQuestions.length} Questions)
                 </h2>
                 <p className="text-xs text-slate-500">
-                  Carefully verify question text, mathematical notation, and MCQ options before importing.
+                  Verify Hindi/English question text, math symbols, and MCQ options before importing to your examination.
                 </p>
               </div>
 
@@ -425,7 +668,7 @@ Q9. A metallic sphere of radius 4.2 cm is melted and recast into the shape of a 
               <span className="font-bold text-slate-700">Filter Question Numbers:</span>
               <input
                 type="text"
-                placeholder="e.g. Q7, Q9 or 7, 9 (or 'all')"
+                placeholder="e.g. Q20, Q7, Q9 or 20 (or 'all')"
                 value={filterQuery}
                 onChange={e => setFilterQuery(e.target.value)}
                 className="px-3 py-1 bg-white border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 focus:outline-violet-500 flex-1 min-w-[160px]"
@@ -438,13 +681,24 @@ Q9. A metallic sphere of radius 4.2 cm is melted and recast into the shape of a 
                 >
                   All
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setFilterQuery('7, 9')}
-                  className="px-2 py-0.5 bg-violet-100 hover:bg-violet-200 rounded text-[11px] font-bold text-violet-800"
-                >
-                  Q7 & Q9
-                </button>
+                {extractedQuestions.some(q => q.detectedNumber === '20') && (
+                  <button
+                    type="button"
+                    onClick={() => setFilterQuery('20')}
+                    className="px-2 py-0.5 bg-violet-100 hover:bg-violet-200 rounded text-[11px] font-bold text-violet-800"
+                  >
+                    Q20
+                  </button>
+                )}
+                {extractedQuestions.some(q => q.detectedNumber === '7') && (
+                  <button
+                    type="button"
+                    onClick={() => setFilterQuery('7, 9')}
+                    className="px-2 py-0.5 bg-violet-100 hover:bg-violet-200 rounded text-[11px] font-bold text-violet-800"
+                  >
+                    Q7 & Q9
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -526,16 +780,27 @@ Q9. A metallic sphere of radius 4.2 cm is melted and recast into the shape of a 
                     rows={3}
                     value={q.prompt}
                     onChange={e => handleUpdateQuestion(idx, { ...q, prompt: e.target.value })}
-                    className="w-full p-3 bg-slate-50 border border-slate-300 rounded-2xl text-xs font-serif leading-relaxed text-slate-900 focus:outline-violet-500"
+                    className="w-full p-3 bg-slate-50 border border-slate-300 rounded-2xl text-xs font-sans leading-relaxed text-slate-900 focus:outline-violet-500"
                   />
                 </div>
 
                 {/* MCQ Options (If MCQ) */}
                 {q.type === 'mcq' && (
                   <div className="space-y-2 pt-2 border-t border-slate-200">
-                    <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                      Options (Review & Select Correct Answer):
-                    </span>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                        Options (Review & Select Correct Answer):
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleAddOption(idx)}
+                        className="text-[11px] font-bold text-violet-700 hover:text-violet-900 flex items-center gap-1 hover:underline"
+                      >
+                        <Plus className="w-3 h-3" />
+                        <span>Add Option</span>
+                      </button>
+                    </div>
+
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       {(q.options || [
                         { id: '1', label: 'A', text: '' },
@@ -567,6 +832,16 @@ Q9. A metallic sphere of radius 4.2 cm is melted and recast into the shape of a 
                             title="Mark as correct answer"
                             className="cursor-pointer"
                           />
+                          {(q.options && q.options.length > 2) && (
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveOption(idx, optIdx)}
+                              className="text-slate-400 hover:text-rose-600 p-1"
+                              title="Delete option"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          )}
                         </div>
                       ))}
                     </div>

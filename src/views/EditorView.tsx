@@ -298,11 +298,13 @@ export const EditorView: React.FC = () => {
         marks: q.marks,
         options: q.options,
         matchPairs: q.matchPairs,
+        diagramUrl: q.diagramUrl,
         solutionText: q.explanation || q.solutionText,
         hint: q.hint,
         tags: [paper.settings.subject, paper.settings.className, q.topic || ''].filter(Boolean)
       }
       await bankService.addQuestion(item)
+
       showToast('Saved to Question Bank for future exams!')
     } catch (err) {
       console.error('Failed to save to bank:', err)
