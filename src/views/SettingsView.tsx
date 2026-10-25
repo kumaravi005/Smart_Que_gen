@@ -4,6 +4,7 @@ import { getDatabase } from '../services/db'
 import { storageService } from '../services/storageService'
 import { Button } from '../components/common/Button'
 import { Badge } from '../components/common/Badge'
+import { TeacherManagementSection } from '../components/admin/TeacherManagementSection'
 
 export const SettingsView: React.FC = () => {
   const [instituteName, setInstituteName] = useState('OMEGA EDUCATION CENTER')
@@ -143,6 +144,9 @@ export const SettingsView: React.FC = () => {
           </div>
         </div>
       </form>
+
+      {/* Admin: Faculty & Teacher Accounts */}
+      <TeacherManagementSection />
 
       {/* Storage Information */}
       <div className="bg-white rounded-3xl border border-slate-200/90 shadow-xs p-6 space-y-3">

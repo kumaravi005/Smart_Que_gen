@@ -17,6 +17,7 @@ import {
   Layers
 } from 'lucide-react'
 import { usePapers } from '../../hooks/usePapers'
+import { useAuth } from '../../hooks/useAuth'
 
 interface SidebarProps {
   isOpen: boolean
@@ -34,6 +35,7 @@ interface NavItem {
 export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
   const [searchParams] = useSearchParams()
   const { papers } = usePapers()
+  const { isAuthenticated, profile, role } = useAuth()
   const location = useLocation()
 
   // Get active or most recent paper ID for contextual workflow navigation
@@ -278,9 +280,17 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
         <div className="p-3.5 border-t border-slate-100 bg-slate-50/70">
           <div className="flex items-center gap-2 text-xs text-slate-600">
             <Sparkles className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-            <span className="font-semibold text-slate-700">Coaching Center Mode</span>
-            <span className="text-[10px] text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded font-bold ml-auto">
-              Offline
+            <span className="font-semibold text-slate-700 truncate">
+              {isAuthenticated ? profile?.full_name || 'Logged In' : 'Coaching Mode'}
+            </span>
+            <span
+              className={`text-[10px] px-1.5 py-0.5 rounded font-bold ml-auto shrink-0 ${
+                isAuthenticated
+                  ? 'bg-blue-100 text-blue-700 uppercase'
+                  : 'text-emerald-700 bg-emerald-50'
+              }`}
+            >
+              {isAuthenticated ? role || 'Online' : 'Offline'}
             </span>
           </div>
         </div>

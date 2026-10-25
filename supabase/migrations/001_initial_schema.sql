@@ -808,8 +808,8 @@ ON CONFLICT (id) DO UPDATE SET
     file_size_limit = 5242880,
     allowed_mime_types = ARRAY['image/png', 'image/jpeg', 'image/webp'];
 
-ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
-
+-- Storage RLS policies for exam-assets bucket
+-- Note: storage.objects has RLS enabled by default in Supabase; do not execute ALTER TABLE on it.
 DROP POLICY IF EXISTS "Storage: Private Download" ON storage.objects;
 CREATE POLICY "Storage: Private Download"
 ON storage.objects FOR SELECT TO authenticated
@@ -875,9 +875,5 @@ GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role;
 GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated, service_role;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;
-
-GRANT USAGE ON SCHEMA storage TO anon, authenticated, service_role;
-GRANT ALL ON TABLE storage.buckets TO anon, authenticated, service_role;
-GRANT ALL ON TABLE storage.objects TO anon, authenticated, service_role;
 
 COMMIT;

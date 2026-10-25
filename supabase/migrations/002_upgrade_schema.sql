@@ -303,7 +303,6 @@ ALTER TABLE public.paper_contents ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.visual_layouts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.templates ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.sync_audit_log ENABLE ROW LEVEL SECURITY;
-ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
 
 -- 4. COLUMN ADDITIONS AND BACKFILLS
 ALTER TABLE public.exam_settings ADD COLUMN IF NOT EXISTS institute_id UUID;
@@ -688,9 +687,5 @@ GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role;
 GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated, service_role;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;
-
-GRANT USAGE ON SCHEMA storage TO anon, authenticated, service_role;
-GRANT ALL ON TABLE storage.buckets TO anon, authenticated, service_role;
-GRANT ALL ON TABLE storage.objects TO anon, authenticated, service_role;
 
 COMMIT;

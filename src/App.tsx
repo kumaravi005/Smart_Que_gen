@@ -14,10 +14,13 @@ import { OcrView } from './views/OcrView'
 import { VoiceView } from './views/VoiceView'
 import { SettingsView } from './views/SettingsView'
 
+import { AuthProvider } from './contexts/AuthContext'
+
 export const App: React.FC = () => {
   return (
     <HashRouter>
-      <Routes>
+      <AuthProvider>
+        <Routes>
         <Route path="/" element={<AppLayout />}>
           <Route index element={<DashboardView />} />
           <Route path="wizard" element={<WizardView />} />
@@ -34,6 +37,7 @@ export const App: React.FC = () => {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>
+      </AuthProvider>
     </HashRouter>
   )
 }
