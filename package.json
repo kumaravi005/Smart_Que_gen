@@ -9,9 +9,11 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "oxlint",
+    "test:supabase": "node scripts/test-connection.js",
     "preview": "vite preview"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.118.0",
     "clsx": "^2.1.1",
     "docx": "^9.13.0",
     "idb": "^8.0.4",
