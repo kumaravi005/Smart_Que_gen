@@ -147,15 +147,11 @@ export const PaperSheet: React.FC<PaperSheetProps> = ({
                     </div>
                   ) : el.type === 'logo' ? (
                     <div className="w-full h-full flex items-center justify-center">
-                      {el.imageUrl || settings.institute.logoUrl ? (
-                        <img
-                          src={el.imageUrl || settings.institute.logoUrl}
-                          alt="Logo"
-                          className="max-w-full max-h-full object-contain pointer-events-none"
-                        />
-                      ) : (
-                        <span className="text-xs font-sans text-slate-400">Institute Logo</span>
-                      )}
+                      <img
+                        src={el.imageUrl || settings.institute.logoUrl || '/omega-logo.png'}
+                        alt="Logo"
+                        className="max-w-full max-h-full object-contain pointer-events-none"
+                      />
                     </div>
                   ) : el.type === 'image' ? (
                     <div className="w-full h-full flex items-center justify-center bg-slate-50 border border-slate-200 rounded">
@@ -231,9 +227,9 @@ export const PaperSheet: React.FC<PaperSheetProps> = ({
           // DEDICATED COVER PAGE
           <div className="flex-1 flex flex-col justify-between py-6 text-center space-y-6">
             <div className="space-y-3">
-              {settings.institute.logoUrl && hf.logoPlacement !== 'none' && (
+              {hf.logoPlacement !== 'none' && (
                 <img
-                  src={settings.institute.logoUrl}
+                  src={settings.institute.logoUrl || '/omega-logo.png'}
                   alt="Logo"
                   className="w-20 h-20 object-contain mx-auto mb-2"
                 />
@@ -339,9 +335,9 @@ export const PaperSheet: React.FC<PaperSheetProps> = ({
                     hf.logoPlacement === 'right' ? 'sm:flex-row-reverse items-center gap-4 text-right' :
                     'text-center'
                   }`}>
-                    {settings.institute.logoUrl && hf.logoPlacement !== 'none' && (
+                    {hf.logoPlacement !== 'none' && (
                       <img
-                        src={settings.institute.logoUrl}
+                        src={settings.institute.logoUrl || '/omega-logo.png'}
                         alt="Logo"
                         className="w-14 h-14 object-contain shrink-0 mx-auto sm:mx-0 mb-1"
                       />

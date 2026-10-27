@@ -5,6 +5,19 @@ import type {
   AdminOperationResult
 } from '../types/auth'
 
+async function parseEdgeFunctionError(error: any): Promise<string> {
+  if (!error) return 'Edge Function error'
+  try {
+    if (error.context && typeof error.context.json === 'function') {
+      const body = await error.context.json()
+      if (body?.error) return body.error
+    }
+  } catch {
+    // JSON extraction failed or already read
+  }
+  return error.message || 'Edge Function execution failed'
+}
+
 /**
  * Service for administrative member and teacher account management.
  * All sensitive account provisioning operations are delegated to the
@@ -35,7 +48,8 @@ export const adminService = {
   },
 
   /**
-   * Provisions a new teacher or administrator account via the Edge Function.
+   * Provisions a new teacher account via the Edge Function.
+   * Only the institute owner can execute this.
    * Does NOT require or expose service-role keys in the client.
    */
   async createTeacher(payload: AdminCreateTeacherPayload): Promise<AdminOperationResult> {
@@ -58,10 +72,11 @@ export const adminService = {
       })
 
       if (error) {
+        const parsedMsg = await parseEdgeFunctionError(error)
         return {
           success: false,
-          message: error.message || 'Failed to communicate with Edge Function.',
-          error: error.message
+          message: parsedMsg,
+          error: parsedMsg
         }
       }
 
@@ -89,6 +104,7 @@ export const adminService = {
 
   /**
    * Revokes access and removes a teacher account via the Edge Function.
+   * Only the institute owner can execute this.
    */
   async revokeTeacher(userId: string): Promise<AdminOperationResult> {
     if (!isSupabaseConfigured || !supabase) {
@@ -107,10 +123,11 @@ export const adminService = {
       })
 
       if (error) {
+        const parsedMsg = await parseEdgeFunctionError(error)
         return {
           success: false,
-          message: error.message || 'Failed to revoke teacher account.',
-          error: error.message
+          message: parsedMsg,
+          error: parsedMsg
         }
       }
 
@@ -156,10 +173,11 @@ export const adminService = {
       })
 
       if (error) {
+        const parsedMsg = await parseEdgeFunctionError(error)
         return {
           success: false,
-          message: error.message,
-          error: error.message
+          message: parsedMsg,
+          error: parsedMsg
         }
       }
 

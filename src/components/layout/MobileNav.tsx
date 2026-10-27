@@ -24,7 +24,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({ onOpenCreateModal }) => {
           end
           className={({ isActive }) =>
             `flex flex-col items-center justify-center w-14 h-12 rounded-xl transition-all ${
-              isActive ? 'text-blue-600 font-semibold' : 'text-slate-500 hover:text-slate-900'
+              isActive ? 'text-[#0055D4] font-bold' : 'text-slate-500 hover:text-slate-900'
             }`
           }
         >
@@ -37,7 +37,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({ onOpenCreateModal }) => {
           to={`/wizard${paperQuery}`}
           className={({ isActive }) =>
             `flex flex-col items-center justify-center w-14 h-12 rounded-xl transition-all ${
-              isActive ? 'text-blue-600 font-semibold' : 'text-slate-500 hover:text-slate-900'
+              isActive ? 'text-[#0055D4] font-bold' : 'text-slate-500 hover:text-slate-900'
             }`
           }
         >
@@ -50,7 +50,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({ onOpenCreateModal }) => {
           <button
             type="button"
             onClick={onOpenCreateModal}
-            className="w-13 h-13 rounded-full bg-gradient-to-tr from-blue-700 via-blue-600 to-indigo-600 text-white flex items-center justify-center shadow-lg shadow-blue-500/35 hover:scale-105 active:scale-95 transition-transform border-2 border-white focus:outline-none"
+            className="w-13 h-13 rounded-full bg-[#0055D4] text-white flex items-center justify-center shadow-lg shadow-blue-900/30 hover:scale-105 active:scale-95 transition-transform border-2 border-[#FFE600] focus:outline-none"
             aria-label="Create New Paper"
           >
             <Plus className="w-6 h-6 stroke-[2.5]" />
@@ -62,7 +62,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({ onOpenCreateModal }) => {
           to={`/editor${paperQuery}`}
           className={({ isActive }) =>
             `flex flex-col items-center justify-center w-14 h-12 rounded-xl transition-all ${
-              isActive ? 'text-blue-600 font-semibold' : 'text-slate-500 hover:text-slate-900'
+              isActive ? 'text-[#0055D4] font-bold' : 'text-slate-500 hover:text-slate-900'
             }`
           }
         >
@@ -75,7 +75,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({ onOpenCreateModal }) => {
           to={`/preview${paperQuery}`}
           className={({ isActive }) =>
             `flex flex-col items-center justify-center w-14 h-12 rounded-xl transition-all ${
-              isActive ? 'text-blue-600 font-semibold' : 'text-slate-500 hover:text-slate-900'
+              isActive ? 'text-[#0055D4] font-bold' : 'text-slate-500 hover:text-slate-900'
             }`
           }
         >

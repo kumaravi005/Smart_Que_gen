@@ -15,28 +15,31 @@ import { VoiceView } from './views/VoiceView'
 import { SettingsView } from './views/SettingsView'
 
 import { AuthProvider } from './contexts/AuthContext'
+import { AuthGate } from './components/auth/AuthGate'
 
 export const App: React.FC = () => {
   return (
     <HashRouter>
       <AuthProvider>
-        <Routes>
-        <Route path="/" element={<AppLayout />}>
-          <Route index element={<DashboardView />} />
-          <Route path="wizard" element={<WizardView />} />
-          <Route path="editor" element={<EditorView />} />
-          <Route path="bank" element={<QuestionBankView />} />
-          <Route path="layout" element={<LayoutEngineView />} />
-          <Route path="designer" element={<DesignerView />} />
-          <Route path="preview" element={<PreviewView />} />
-          <Route path="export" element={<ExportView />} />
-          <Route path="drafts" element={<DraftsView />} />
-          <Route path="ocr" element={<OcrView />} />
-          <Route path="voice" element={<VoiceView />} />
-          <Route path="settings" element={<SettingsView />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Route>
-      </Routes>
+        <AuthGate>
+          <Routes>
+            <Route path="/" element={<AppLayout />}>
+              <Route index element={<DashboardView />} />
+              <Route path="wizard" element={<WizardView />} />
+              <Route path="editor" element={<EditorView />} />
+              <Route path="bank" element={<QuestionBankView />} />
+              <Route path="layout" element={<LayoutEngineView />} />
+              <Route path="designer" element={<DesignerView />} />
+              <Route path="preview" element={<PreviewView />} />
+              <Route path="export" element={<ExportView />} />
+              <Route path="drafts" element={<DraftsView />} />
+              <Route path="ocr" element={<OcrView />} />
+              <Route path="voice" element={<VoiceView />} />
+              <Route path="settings" element={<SettingsView />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Route>
+          </Routes>
+        </AuthGate>
       </AuthProvider>
     </HashRouter>
   )

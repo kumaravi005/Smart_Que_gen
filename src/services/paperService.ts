@@ -114,11 +114,12 @@ export const paperService = {
     // Fetch default institute profile from app settings or fallback
     const instituteSetting = await db.get('app_settings', 'institute_profile')
     const institute = instituteSetting?.value || {
-      name: 'OMEGA EDUCATION CENTER',
-      tagline: 'Excellence in Coaching & Board Preparations',
-      affiliation: 'Center Code: OEC-2026 / CBSE & State Board Curriculum',
+      name: 'OMEGA EDUCATION CENTRE',
+      tagline: 'एक अद्भुत शिक्षण शैली... | BOARD • JNV • CHS • OLYMPIAD',
+      affiliation: 'BOARD | JNV | CHS | OLYMPIAD | NAVODAYA | SAINIK SCHOOL',
       address: 'Knowledge Park, Phase 2, Near City Center',
-      contact: 'Phone: +91 98765 43210 | info@omegaedu.org'
+      contact: 'Phone: +91 98765 43210 | info@omegaedu.org',
+      logoUrl: '/omega-logo.png'
     }
 
     const defaultSections: ExamSectionConfig[] = params?.sections || [

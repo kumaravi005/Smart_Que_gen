@@ -64,10 +64,10 @@ serve(async (req: Request) => {
       )
     }
 
-    if (callerProfile.role !== 'owner' && callerProfile.role !== 'admin') {
+    if (callerProfile.role !== 'owner') {
       return new Response(
         JSON.stringify({
-          error: 'Forbidden: Only institute owners or administrators can manage teacher accounts'
+          error: 'Forbidden: Only the institute owner can create or deactivate teacher accounts'
         }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )

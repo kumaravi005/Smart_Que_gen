@@ -4,6 +4,11 @@
   :root {
     --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     --font-serif: 'Times New Roman', 'Liberation Serif', serif;
+    --color-omega-yellow: #FFE600;
+    --color-omega-yellow-light: #FFF9C4;
+    --color-omega-blue: #0055D4;
+    --color-omega-blue-dark: #003F9E;
+    --color-omega-green: #047857;
   }
 
   html {
@@ -18,6 +23,32 @@
     min-height: 100vh;
     margin: 0;
   }
+}
+
+/* Omega Education Centre Brand Utility Classes */
+.bg-omega-yellow {
+  background-color: #FFE600;
+}
+.bg-omega-yellow-light {
+  background-color: #FEF9C3;
+}
+.bg-omega-blue {
+  background-color: #0055D4;
+}
+.bg-omega-blue-dark {
+  background-color: #003F9E;
+}
+.text-omega-blue {
+  color: #0055D4;
+}
+.text-omega-green {
+  color: #047857;
+}
+.border-omega-blue {
+  border-color: #0055D4;
+}
+.border-omega-yellow {
+  border-color: #FFE600;
 }
 
 /* Print optimizations for paper generation */

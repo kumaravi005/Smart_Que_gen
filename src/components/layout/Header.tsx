@@ -1,17 +1,14 @@
-import React, { useState } from 'react'
+import React from 'react'
 import { Link } from 'react-router-dom'
 import {
   Menu,
   Plus,
-  GraduationCap,
-  LogIn,
   LogOut,
   ShieldCheck
 } from 'lucide-react'
 import { NetworkIndicator } from '../common/NetworkIndicator'
 import { Button } from '../common/Button'
 import { useAuth } from '../../hooks/useAuth'
-import { LoginModal } from '../auth/LoginModal'
 
 interface HeaderProps {
   onToggleSidebar: () => void
@@ -19,13 +16,12 @@ interface HeaderProps {
 }
 
 export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onOpenCreateModal }) => {
-  const { user, profile, institute, isAuthenticated, needsSetup, logout } = useAuth()
-  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false)
+  const { user, profile, institute, isAuthenticated, logout } = useAuth()
 
   const roleBadgeColors = {
-    owner: 'bg-purple-100 text-purple-700 border-purple-200',
-    admin: 'bg-blue-100 text-blue-700 border-blue-200',
-    teacher: 'bg-emerald-100 text-emerald-700 border-emerald-200'
+    owner: 'bg-[#FFE600] text-blue-950 border-yellow-400 font-bold shadow-xs',
+    admin: 'bg-blue-100 text-[#0055D4] border-blue-200 font-bold',
+    teacher: 'bg-emerald-100 text-emerald-800 border-emerald-200 font-bold'
   }
 
   const roleLabel = profile?.role
@@ -34,7 +30,7 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onOpenCreateMod
 
   return (
     <>
-      <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-200/80 shadow-xs">
+      <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-t-4 border-[#0055D4] border-b border-slate-200/80 shadow-xs">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16 gap-3">
             {/* Left Brand & Mobile Hamburger */}
@@ -49,20 +45,19 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onOpenCreateMod
               </button>
 
               <Link to="/" className="flex items-center gap-2.5 group">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-700 via-blue-600 to-indigo-500 flex items-center justify-center text-white shadow-md shadow-blue-500/25 group-hover:scale-105 transition-transform">
-                  <GraduationCap className="w-5 h-5" />
-                </div>
+                <img
+                  src="/omega-logo.png"
+                  alt="Omega Education Centre"
+                  className="h-10 w-10 sm:h-11 sm:w-11 object-contain rounded-xl border border-[#0055D4]/20 shadow-xs group-hover:scale-105 transition-transform shrink-0"
+                />
                 <div className="flex flex-col">
                   <div className="flex items-center gap-1.5">
-                    <span className="font-bold text-slate-900 tracking-tight text-sm sm:text-base">
-                      {institute?.name || 'OMEGA'}
-                    </span>
-                    <span className="text-[10px] font-semibold tracking-wider uppercase px-1.5 py-0.2 rounded bg-blue-100 text-blue-700">
-                      Edu
+                    <span className="font-extrabold text-[#0055D4] tracking-tight text-sm sm:text-base">
+                      {institute?.name || 'OMEGA EDUCATION CENTRE'}
                     </span>
                   </div>
-                  <span className="text-[11px] text-slate-500 font-medium hidden sm:inline leading-none">
-                    Smart Question Paper Generator
+                  <span className="text-[11px] text-emerald-700 font-semibold hidden sm:inline leading-none">
+                    {institute?.tagline || 'एक अद्भुत शिक्षण शैली...'}
                   </span>
                 </div>
               </Link>
@@ -72,62 +67,41 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onOpenCreateMod
             <div className="flex items-center gap-2 sm:gap-3">
               <NetworkIndicator />
 
-              {/* Authentication Status Button */}
-              {isAuthenticated ? (
+              {/* User Profile & Sign Out Button */}
+              {isAuthenticated && (
                 <div className="flex items-center gap-2 pl-1 border-l border-slate-200">
-                  {needsSetup ? (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setIsLoginModalOpen(true)}
-                      className="text-xs text-amber-700 bg-amber-50 border-amber-300 hover:bg-amber-100 animate-pulse"
-                      leftIcon={<ShieldCheck className="w-3.5 h-3.5 text-amber-600" />}
-                    >
-                      Complete Setup
-                    </Button>
-                  ) : (
-                    <div className="hidden md:flex flex-col text-right">
-                      <div className="flex items-center gap-1.5 justify-end">
-                        <span className="text-xs font-bold text-slate-900 max-w-[130px] truncate">
-                          {profile?.full_name || user?.email?.split('@')[0]}
-                        </span>
-                        {profile?.role && (
-                          <span
-                            className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full border ${
-                              roleBadgeColors[profile.role] || 'bg-slate-100 text-slate-600'
-                            }`}
-                          >
-                            {profile.role === 'owner' && <ShieldCheck className="w-2.5 h-2.5 inline mr-0.5" />}
-                            {roleLabel}
-                          </span>
-                        )}
-                      </div>
-                      <span className="text-[10px] text-slate-500 font-medium">
-                        {institute?.name || 'Shared Institute'}
+                  <div className="hidden md:flex flex-col text-right">
+                    <div className="flex items-center gap-1.5 justify-end">
+                      <span className="text-xs font-bold text-slate-900 max-w-[130px] truncate">
+                        {profile?.full_name || user?.email?.split('@')[0]}
                       </span>
+                      {profile?.role && (
+                        <span
+                          className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full border ${
+                            roleBadgeColors[profile.role] || 'bg-slate-100 text-slate-600'
+                          }`}
+                        >
+                          {profile.role === 'owner' && <ShieldCheck className="w-2.5 h-2.5 inline mr-0.5" />}
+                          {roleLabel}
+                        </span>
+                      )}
                     </div>
-                  )}
+                    <span className="text-[10px] text-slate-500 font-medium">
+                      {institute?.name || 'Shared Institute'}
+                    </span>
+                  </div>
 
                   <button
                     type="button"
                     onClick={() => logout()}
-                    className="p-2 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors"
+                    className="p-2 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors flex items-center gap-1.5 text-xs font-semibold"
                     title="Sign Out"
                     aria-label="Sign Out"
                   >
                     <LogOut className="w-4 h-4" />
+                    <span className="hidden sm:inline">Sign Out</span>
                   </button>
                 </div>
-              ) : (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  leftIcon={<LogIn className="w-4 h-4" />}
-                  onClick={() => setIsLoginModalOpen(true)}
-                  className="text-xs"
-                >
-                  Teacher Login
-                </Button>
               )}
 
               <Button
@@ -143,11 +117,6 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onOpenCreateMod
           </div>
         </div>
       </header>
-
-      <LoginModal
-        isOpen={isLoginModalOpen}
-        onClose={() => setIsLoginModalOpen(false)}
-      />
     </>
   )
 }

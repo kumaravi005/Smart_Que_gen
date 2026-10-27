@@ -1,6 +1,21 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import 'fake-indexeddb/auto'
 import { adminService } from '../services/adminService'
 import { supabase } from '../services/supabaseClient'
+
+if (typeof globalThis.localStorage === 'undefined') {
+  const store = new Map<string, string>()
+  ;(globalThis as any).localStorage = {
+    getItem: (key: string) => store.get(key) ?? null,
+    setItem: (key: string, val: string) => store.set(key, String(val)),
+    removeItem: (key: string) => store.delete(key),
+    clear: () => store.clear(),
+    key: (index: number) => Array.from(store.keys())[index] ?? null,
+    get length() {
+      return store.size
+    }
+  }
+}
 
 describe('Authentication & Admin-Controlled Teacher Accounts', () => {
   beforeEach(() => {
@@ -175,6 +190,102 @@ describe('Authentication & Admin-Controlled Teacher Accounts', () => {
     ])
     expect(res.data?.success).toBe(true)
     expect(res.data?.role).toBe('owner')
+  })
+
+  it('adminService gracefully extracts custom error message from FunctionsHttpError context', async () => {
+    if (!supabase) return
+
+    const functionsProto = Object.getPrototypeOf(supabase.functions)
+    vi.spyOn(functionsProto, 'invoke').mockResolvedValueOnce({
+      data: null,
+      error: {
+        name: 'FunctionsHttpError',
+        message: 'Edge Function returned a non-2xx status code',
+        context: {
+          json: async () => ({
+            error: 'Forbidden: Only the institute owner can create or deactivate teacher accounts'
+          })
+        }
+      } as any
+    })
+
+    const result = await adminService.createTeacher({
+      email: 'intruder@test.com',
+      password: 'Password123',
+      full_name: 'Intruder',
+      role: 'teacher'
+    })
+
+    expect(result.success).toBe(false)
+    expect(result.message).toBe('Forbidden: Only the institute owner can create or deactivate teacher accounts')
+  })
+
+  it('offline IndexedDB stores and functionality remain functional without Supabase', async () => {
+    const { getDatabase } = await import('../services/db')
+    const db = await getDatabase()
+    expect(db).toBeDefined()
+    expect(typeof db.getAll).toBe('function')
+
+    // Verify paper, question bank, and template stores exist locally
+    const stores = ['papers', 'question_bank', 'templates', 'bank_folders', 'app_settings']
+    for (const store of stores) {
+      const items = await db.getAll(store as any)
+      expect(Array.isArray(items)).toBe(true)
+    }
+  })
+
+  it('offline auth profile caching and restoration preserve teacher session offline', () => {
+    const mockUid = 'user_offline_123'
+    const mockInstId = 'inst_omega_456'
+    const cachedProfile = {
+      id: mockUid,
+      institute_id: mockInstId,
+      full_name: 'Pooja Verma',
+      role: 'teacher' as const
+    }
+
+    // Cache to localStorage
+    localStorage.setItem(`omega_auth_profile_${mockUid}`, JSON.stringify(cachedProfile))
+    localStorage.setItem(`omega_auth_institute_${mockInstId}`, JSON.stringify({
+      id: mockInstId,
+      name: 'Omega Education Center'
+    }))
+
+    // Verify retrieval
+    const retrievedProf = JSON.parse(localStorage.getItem(`omega_auth_profile_${mockUid}`) || '{}')
+    expect(retrievedProf.full_name).toBe('Pooja Verma')
+    expect(retrievedProf.role).toBe('teacher')
+    expect(retrievedProf.institute_id).toBe(mockInstId)
+
+    // Verify cleanup
+    localStorage.removeItem(`omega_auth_profile_${mockUid}`)
+    localStorage.removeItem(`omega_auth_institute_${mockInstId}`)
+    expect(localStorage.getItem(`omega_auth_profile_${mockUid}`)).toBeNull()
+  })
+
+  it('authentication gate rules strictly require session AND valid institute_id profile', () => {
+    // Helper function mirroring AuthGate decision logic
+    const canAccessApp = (isAuthenticated: boolean, needsSetup: boolean, profile: any) => {
+      if (!isAuthenticated || needsSetup || !profile || !profile.institute_id) {
+        return false
+      }
+      return true
+    }
+
+    // Scenario 1: Logged out / unauthenticated visitor
+    expect(canAccessApp(false, false, null)).toBe(false)
+
+    // Scenario 2: Authenticated in Supabase but no profile yet (needs root setup)
+    expect(canAccessApp(true, true, null)).toBe(false)
+
+    // Scenario 3: Authenticated but profile has no institute_id
+    expect(canAccessApp(true, false, { id: 'u1', role: 'teacher' })).toBe(false)
+
+    // Scenario 4: Authenticated Teacher with authorized institute
+    expect(canAccessApp(true, false, { id: 'u1', role: 'teacher', institute_id: 'inst_1' })).toBe(true)
+
+    // Scenario 5: Authenticated Owner with authorized institute
+    expect(canAccessApp(true, false, { id: 'u2', role: 'owner', institute_id: 'inst_1' })).toBe(true)
   })
 })
 

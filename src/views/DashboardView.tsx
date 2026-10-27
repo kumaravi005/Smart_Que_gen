@@ -10,7 +10,6 @@ import {
   Archive,
   ScanText,
   Mic,
-  GraduationCap,
   Clock,
   Trash2,
   ArrowRight,
@@ -18,6 +17,7 @@ import {
   Printer
 } from 'lucide-react'
 import { usePapers } from '../hooks/usePapers'
+import { useAuth } from '../hooks/useAuth'
 import { Button } from '../components/common/Button'
 import { Badge } from '../components/common/Badge'
 import { formatRelativeTime } from '../utils/date'
@@ -30,6 +30,7 @@ export const DashboardView: React.FC = () => {
   const navigate = useNavigate()
   const { openCreateModal } = useOutletContext<OutletContextType>()
   const { papers, loading, error, deletePaper } = usePapers()
+  const { profile, institute, role } = useAuth()
 
   const handleDelete = async (id: string, title: string) => {
     if (window.confirm(`Are you sure you want to delete "${title}"? This cannot be undone.`)) {
@@ -47,37 +48,44 @@ export const DashboardView: React.FC = () => {
   return (
     <div className="space-y-8 animate-in fade-in duration-300 max-w-6xl mx-auto pb-12">
       {/* 1. Welcoming Hero Banner */}
-      <div className="relative overflow-hidden bg-gradient-to-r from-blue-900 via-blue-800 to-indigo-900 rounded-3xl p-6 sm:p-8 text-white shadow-xl shadow-blue-900/15">
-        <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute bottom-0 right-10 w-48 h-48 bg-indigo-500/10 rounded-full blur-2xl pointer-events-none" />
+      <div className="relative overflow-hidden bg-gradient-to-r from-[#003B94] via-[#0055D4] to-[#0041a8] rounded-3xl p-6 sm:p-8 text-white shadow-xl shadow-blue-950/20 border-2 border-[#0055D4]">
+        <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-amber-400/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-0 right-10 w-48 h-48 bg-blue-300/10 rounded-full blur-2xl pointer-events-none" />
 
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="space-y-2 max-w-xl">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md text-blue-200 text-xs font-semibold border border-white/10">
-              <GraduationCap className="w-4 h-4 text-blue-300" />
-              <span>Omega Education Center — Assessment Hub</span>
-              {papers.length > 0 && (
-                <span className="ml-1 pl-2 border-l border-white/20 text-white font-bold">
-                  {papers.length} Papers • {totalQuestionsSum} Questions
-                </span>
-              )}
+        <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5">
+            <div className="bg-white p-2 rounded-2xl border-2 border-[#FFE600] shrink-0 shadow-md">
+              <img
+                src="/omega-logo.png"
+                alt="Omega Education Centre"
+                className="h-16 sm:h-20 w-auto object-contain"
+              />
             </div>
-            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight text-white leading-tight">
-              Create Question Papers in 3 Easy Steps
-            </h1>
-            <p className="text-blue-100 text-sm sm:text-base leading-relaxed">
-              Designed for educators and coaching staff. Configure exam details, add your questions,
-              and immediately print or export to A4 PDF, Word, or Excel.
-            </p>
+            <div className="space-y-1.5 max-w-xl">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#FFE600] text-blue-950 text-xs font-bold shadow-xs">
+                <span>{institute?.name || 'Omega Education Centre'}</span>
+                {papers.length > 0 && (
+                  <span className="ml-1 pl-2 border-l border-blue-900/30 text-blue-900 font-bold">
+                    {papers.length} Papers • {totalQuestionsSum} Questions
+                  </span>
+                )}
+              </div>
+              <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white leading-tight">
+                {profile?.full_name ? `Welcome, ${profile.full_name}` : 'Omega Question Paper Generator'}
+              </h1>
+              <p className="text-blue-100 text-xs sm:text-sm leading-relaxed">
+                Signed in as <strong className="text-white capitalize">{role || 'faculty member'}</strong>. Access your shared institute question bank, build question papers, and export to A4 PDF, Word, or Excel.
+              </p>
+            </div>
           </div>
 
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 shrink-0">
             <Button
               variant="primary"
               size="lg"
-              leftIcon={<Plus className="w-5 h-5" />}
+              leftIcon={<Plus className="w-5 h-5 text-blue-950" />}
               onClick={openCreateModal}
-              className="bg-white text-blue-900 hover:bg-blue-50 active:bg-blue-100 shadow-lg shadow-black/10 border-0 font-bold"
+              className="bg-[#FFE600] text-blue-950 hover:bg-[#f2db00] active:bg-[#e0cb00] shadow-lg shadow-black/15 border-0 font-bold"
             >
               + Create New Paper
             </Button>
@@ -86,7 +94,7 @@ export const DashboardView: React.FC = () => {
               size="lg"
               leftIcon={<Archive className="w-5 h-5" />}
               onClick={() => navigate('/drafts')}
-              className="bg-white/10 text-white border-white/20 hover:bg-white/20 hover:border-white/30"
+              className="bg-white/10 text-white border-white/20 hover:bg-white/20 hover:border-white/30 font-semibold"
             >
               My Saved Papers ({papers.length})
             </Button>

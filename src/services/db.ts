@@ -147,11 +147,12 @@ export async function seedInitialDataIfEmpty(): Promise<void> {
     id: settingsId,
     paperId,
     institute: {
-      name: 'OMEGA EDUCATION CENTER',
-      tagline: 'Excellence in Coaching & Board Preparations',
-      affiliation: 'Center Code: OEC-2026 / CBSE & State Board Curriculum',
+      name: 'OMEGA EDUCATION CENTRE',
+      tagline: 'एक अद्भुत शिक्षण शैली... | BOARD • JNV • CHS • OLYMPIAD',
+      affiliation: 'BOARD | JNV | CHS | OLYMPIAD | NAVODAYA | SAINIK SCHOOL',
       address: 'Knowledge Park, Phase 2, Near City Center',
-      contact: 'Phone: +91 98765 43210 | info@omegaedu.org'
+      contact: 'Phone: +91 98765 43210 | info@omegaedu.org',
+      logoUrl: '/omega-logo.png'
     },
     examName: 'Mid-Term Examination 2026-27',
     academicSession: '2026-2027',

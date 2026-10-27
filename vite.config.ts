@@ -10,20 +10,20 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.svg', 'apple-touch-icon.png'],
+      includeAssets: ['omega-logo.png', 'favicon.svg', 'apple-touch-icon.png'],
       manifest: {
-        name: 'Omega Education Center — Smart Question Paper Generator',
+        name: 'Omega Education Centre — Smart Question Paper Generator',
         short_name: 'Omega PaperGen',
         description: 'Smart Question Paper Generation System for Educators',
-        theme_color: '#2563eb',
-        background_color: '#f8fafc',
+        theme_color: '#0055D4',
+        background_color: '#FFE600',
         display: 'standalone',
         orientation: 'portrait',
         icons: [
           {
-            src: '/favicon.svg',
+            src: '/omega-logo.png',
             sizes: '192x192 512x512',
-            type: 'image/svg+xml',
+            type: 'image/png',
             purpose: 'any maskable'
           }
         ]

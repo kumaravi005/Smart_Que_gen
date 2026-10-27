@@ -116,12 +116,21 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
         }`}
       >
         {/* Top Header in Drawer */}
-        <div className="flex items-center justify-between h-16 px-5 border-b border-slate-100">
-          <div className="flex items-center gap-2">
-            <span className="font-bold text-slate-800 tracking-tight">Omega Question Hub</span>
-            <span className="text-[10px] bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full font-bold">
-              Coaching v1.0
-            </span>
+        <div className="flex items-center justify-between h-16 px-4 border-b border-slate-100">
+          <div className="flex items-center gap-2.5">
+            <img
+              src="/omega-logo.png"
+              alt="Omega"
+              className="h-9 w-9 object-contain rounded-lg border border-[#0055D4]/20 shrink-0"
+            />
+            <div className="flex flex-col">
+              <span className="font-extrabold text-[#0055D4] text-xs leading-tight tracking-tight">
+                Omega Education Centre
+              </span>
+              <span className="text-[10px] text-emerald-700 font-semibold leading-tight">
+                Assessment Hub
+              </span>
+            </div>
           </div>
           <button
             onClick={onClose}

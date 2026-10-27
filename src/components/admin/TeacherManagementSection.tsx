@@ -19,7 +19,7 @@ import { Badge } from '../common/Badge'
 import { Modal } from '../common/Modal'
 
 export const TeacherManagementSection: React.FC = () => {
-  const { user, profile, isAdmin, isOwner, isConfigured } = useAuth()
+  const { user, profile, isOwner, isAuthenticated, isConfigured } = useAuth()
 
   const [members, setMembers] = useState<UserProfile[]>([])
   const [isLoading, setIsLoading] = useState(false)
@@ -31,7 +31,6 @@ export const TeacherManagementSection: React.FC = () => {
   const [newFullName, setNewFullName] = useState('')
   const [newEmail, setNewEmail] = useState('')
   const [newPassword, setNewPassword] = useState('')
-  const [newRole, setNewRole] = useState<'teacher' | 'admin'>('teacher')
   const [isCreating, setIsCreating] = useState(false)
   const [addError, setAddError] = useState<string | null>(null)
   const [createdSummary, setCreatedSummary] = useState<{
@@ -52,7 +51,7 @@ export const TeacherManagementSection: React.FC = () => {
   const [resetSuccess, setResetSuccess] = useState(false)
 
   const loadMembers = useCallback(async () => {
-    if (!isAdmin || !isConfigured) return
+    if (!isConfigured || !isAuthenticated) return
     setIsLoading(true)
     setErrorMessage(null)
     try {
@@ -63,7 +62,7 @@ export const TeacherManagementSection: React.FC = () => {
     } finally {
       setIsLoading(false)
     }
-  }, [isAdmin, isConfigured])
+  }, [isConfigured, isAuthenticated])
 
   useEffect(() => {
     loadMembers()
@@ -82,7 +81,6 @@ export const TeacherManagementSection: React.FC = () => {
     setNewFullName('')
     setNewEmail('')
     setNewPassword(generateRandomPassword())
-    setNewRole('teacher')
     setAddError(null)
     setCreatedSummary(null)
     setIsAddModalOpen(true)
@@ -98,7 +96,7 @@ export const TeacherManagementSection: React.FC = () => {
         full_name: newFullName,
         email: newEmail,
         password: newPassword,
-        role: newRole
+        role: 'teacher'
       })
 
       if (result.success) {
@@ -106,7 +104,7 @@ export const TeacherManagementSection: React.FC = () => {
           email: newEmail,
           pass: newPassword,
           name: newFullName,
-          role: newRole
+          role: 'teacher'
         })
         await loadMembers()
       } else {
@@ -179,19 +177,15 @@ export const TeacherManagementSection: React.FC = () => {
     )
   }
 
-  if (!isAdmin) {
+  if (!isAuthenticated) {
     return (
       <div className="bg-white rounded-3xl border border-slate-200/90 shadow-xs p-6 space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2.5 text-slate-800 font-bold text-sm">
-            <Users className="w-5 h-5 text-blue-600" />
-            <span>Institute Faculty</span>
-          </div>
-          <Badge variant="default" size="sm">Teacher View</Badge>
+        <div className="flex items-center gap-2.5 text-slate-800 font-bold text-sm">
+          <Users className="w-5 h-5 text-blue-600" />
+          <span>Faculty & Teacher Management</span>
         </div>
         <p className="text-xs text-slate-500">
-          You are signed in as a Teacher. All question papers and bank items are shared across your institute.
-          Teacher account administration is reserved for institute Owners and Administrators.
+          Sign in as the Institute Owner to provision and manage cloud accounts for coaching teachers.
         </p>
       </div>
     )
@@ -205,14 +199,16 @@ export const TeacherManagementSection: React.FC = () => {
           <div className="flex items-center gap-2">
             <h3 className="font-bold text-slate-900 text-sm sm:text-base flex items-center gap-2">
               <Users className="w-5 h-5 text-blue-600" />
-              <span>Admin: Teacher & Staff Accounts</span>
+              <span>{isOwner ? 'Owner: Teacher & Staff Accounts' : 'Shared Institute Faculty'}</span>
             </h3>
-            <Badge variant="primary" size="sm">
-              {profile?.role === 'owner' ? 'Owner Portal' : 'Admin Portal'}
+            <Badge variant={isOwner ? 'primary' : 'default'} size="sm">
+              {isOwner ? 'Owner Portal' : 'Teacher View'}
             </Badge>
           </div>
           <p className="text-xs text-slate-500 mt-0.5">
-            Create and revoke teacher accounts. All authorized teachers access your shared institute dataset.
+            {isOwner
+              ? 'Create, manage, and deactivate teacher accounts. All authorized teachers access your shared institute dataset.'
+              : `Signed in as ${profile?.full_name || 'Teacher'}. All question papers, bank items, and templates are shared across your institute.`}
           </p>
         </div>
 
@@ -227,16 +223,27 @@ export const TeacherManagementSection: React.FC = () => {
             Refresh
           </Button>
 
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={handleOpenAddModal}
-            leftIcon={<UserPlus className="w-4 h-4" />}
-          >
-            Add Teacher
-          </Button>
+          {isOwner && (
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={handleOpenAddModal}
+              leftIcon={<UserPlus className="w-4 h-4" />}
+            >
+              Add Teacher
+            </Button>
+          )}
         </div>
       </div>
+
+      {!isOwner && (
+        <div className="p-3 bg-blue-50/70 border border-blue-200 rounded-2xl text-xs text-blue-800 flex items-center gap-2">
+          <ShieldCheck className="w-4 h-4 text-blue-600 shrink-0" />
+          <span>
+            Teacher account creation, password resets, and deactivations are strictly restricted to the Institute Owner.
+          </span>
+        </div>
+      )}
 
       {errorMessage && (
         <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700">
@@ -299,7 +306,7 @@ export const TeacherManagementSection: React.FC = () => {
 
                   <td className="px-4 py-3 text-right">
                     <div className="inline-flex items-center gap-1">
-                      {!isSelf && !isOwnerRole && (
+                      {isOwner && !isSelf && !isOwnerRole ? (
                         <>
                           <button
                             type="button"
@@ -318,11 +325,15 @@ export const TeacherManagementSection: React.FC = () => {
                             type="button"
                             onClick={() => setRevokeTarget(member)}
                             className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                            title="Revoke Teacher Access"
+                            title="Deactivate / Revoke Teacher Access"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
                         </>
+                      ) : (
+                        <span className="text-[11px] text-slate-400 font-normal">
+                          {isSelf ? 'Current User' : isOwnerRole ? 'Owner' : 'Active'}
+                        </span>
                       )}
                     </div>
                   </td>
@@ -333,7 +344,9 @@ export const TeacherManagementSection: React.FC = () => {
             {members.length === 0 && !isLoading && (
               <tr>
                 <td colSpan={4} className="px-4 py-6 text-center text-slate-400">
-                  No teachers found. Click "Add Teacher" above to provision accounts.
+                  {isOwner
+                    ? 'No teachers found. Click "Add Teacher" above to provision accounts.'
+                    : 'No faculty members found in your institute.'}
                 </td>
               </tr>
             )}
@@ -445,21 +458,20 @@ export const TeacherManagementSection: React.FC = () => {
               />
             </div>
 
-            {isOwner && (
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">
-                  Access Role
-                </label>
-                <select
-                  value={newRole}
-                  onChange={(e) => setNewRole(e.target.value as 'teacher' | 'admin')}
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm"
-                >
-                  <option value="teacher">Teacher (Create & export papers, access bank)</option>
-                  <option value="admin">Administrator (Manage other teachers and settings)</option>
-                </select>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">
+                Assigned Role
+              </label>
+              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 space-y-1">
+                <div className="flex items-center gap-1.5 font-bold text-slate-800">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                  <span>Teacher</span>
+                </div>
+                <p className="text-[11px] text-slate-500">
+                  Shares common institute question bank, papers, folders, and templates. Cannot provision or deactivate other accounts.
+                </p>
               </div>
-            )}
+            </div>
 
             <div className="pt-2 flex justify-end gap-2 border-t border-slate-100">
               <Button variant="outline" size="sm" type="button" onClick={() => setIsAddModalOpen(false)}>

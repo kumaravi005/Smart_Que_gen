@@ -39,6 +39,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [institute, setInstitute] = useState<Institute | null>(null)
   const [isLoading, setIsLoading] = useState<boolean>(true)
 
+  const CACHE_PROFILE_KEY = (uid: string) => `omega_auth_profile_${uid}`
+  const CACHE_INSTITUTE_KEY = (iid: string) => `omega_auth_institute_${iid}`
+
   const fetchProfileAndInstitute = useCallback(async (userId: string, userEmail?: string): Promise<UserProfile | null> => {
     if (!supabase) return null
 
@@ -52,6 +55,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (profErr) {
         console.warn('Could not retrieve user profile:', profErr.message)
+
+        // Offline / Network fallback: recover cached profile if offline
+        const cachedProfStr = localStorage.getItem(CACHE_PROFILE_KEY(userId))
+        if (cachedProfStr) {
+          try {
+            const cachedProf = JSON.parse(cachedProfStr) as UserProfile
+            setProfile(cachedProf)
+            if (cachedProf.institute_id) {
+              const cachedInstStr = localStorage.getItem(CACHE_INSTITUTE_KEY(cachedProf.institute_id))
+              if (cachedInstStr) {
+                setInstitute(JSON.parse(cachedInstStr) as Institute)
+              }
+            }
+            return cachedProf
+          } catch {
+            // ignore cache parse failure
+          }
+        }
+
         setProfile(null)
         setInstitute(null)
         return null
@@ -63,6 +85,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           email: userEmail || prof.email
         }
         setProfile(enrichedProfile)
+        try {
+          localStorage.setItem(CACHE_PROFILE_KEY(userId), JSON.stringify(enrichedProfile))
+        } catch {
+          // ignore localStorage quota error
+        }
 
         // 2. Fetch associated institute record
         if (prof.institute_id) {
@@ -74,16 +101,42 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
           if (!instErr && inst) {
             setInstitute(inst as Institute)
+            try {
+              localStorage.setItem(CACHE_INSTITUTE_KEY(prof.institute_id), JSON.stringify(inst))
+            } catch {
+              // ignore localStorage quota error
+            }
           }
         }
         return enrichedProfile
       } else {
+        // Authenticated user has no profile row yet (first-time setup required)
+        localStorage.removeItem(CACHE_PROFILE_KEY(userId))
         setProfile(null)
         setInstitute(null)
         return null
       }
     } catch (err) {
       console.error('Error fetching profile and institute:', err)
+
+      // Offline / Network fallback: recover cached profile
+      const cachedProfStr = localStorage.getItem(CACHE_PROFILE_KEY(userId))
+      if (cachedProfStr) {
+        try {
+          const cachedProf = JSON.parse(cachedProfStr) as UserProfile
+          setProfile(cachedProf)
+          if (cachedProf.institute_id) {
+            const cachedInstStr = localStorage.getItem(CACHE_INSTITUTE_KEY(cachedProf.institute_id))
+            if (cachedInstStr) {
+              setInstitute(JSON.parse(cachedInstStr) as Institute)
+            }
+          }
+          return cachedProf
+        } catch {
+          // ignore cache parse failure
+        }
+      }
+
       setProfile(null)
       setInstitute(null)
       return null
@@ -190,6 +243,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = useCallback(async (): Promise<void> => {
     if (!supabase) return
     try {
+      if (user) {
+        localStorage.removeItem(`omega_auth_profile_${user.id}`)
+      }
+      if (profile?.institute_id) {
+        localStorage.removeItem(`omega_auth_institute_${profile.institute_id}`)
+      }
       await supabase.auth.signOut()
     } catch (err) {
       console.warn('Sign-out error:', err)
@@ -199,7 +258,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setProfile(null)
       setInstitute(null)
     }
-  }, [])
+  }, [user, profile])
 
   const refreshProfile = useCallback(async (): Promise<void> => {
     if (user) {
