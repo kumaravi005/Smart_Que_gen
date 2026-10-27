@@ -111,12 +111,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
 
       {/* Sidebar Drawer */}
       <aside
-        className={`fixed top-0 bottom-0 left-0 z-50 w-72 bg-white border-r border-slate-200/90 flex flex-col transition-transform duration-200 ease-in-out lg:static lg:translate-x-0 ${
+        className={`fixed top-0 bottom-0 left-0 z-50 w-72 bg-white border-r border-slate-200/90 flex flex-col transition-transform duration-200 ease-in-out lg:sticky lg:top-16 lg:h-[calc(100vh-4rem)] lg:self-start lg:translate-x-0 lg:z-10 shrink-0 ${
           isOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
-        {/* Top Header in Drawer */}
-        <div className="flex items-center justify-between h-16 px-4 border-b border-slate-100">
+        {/* Top Header in Drawer (Mobile drawer only - on desktop the main Header sits right above) */}
+        <div className="lg:hidden flex items-center justify-between h-16 px-4 border-b border-slate-100 shrink-0">
           <div className="flex items-center gap-2.5">
             <img
               src="/omega-logo.png"
@@ -134,7 +134,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
           </div>
           <button
             onClick={onClose}
-            className="lg:hidden p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100"
           >
             <X className="w-5 h-5" />
           </button>
