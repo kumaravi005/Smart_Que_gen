@@ -1,4 +1,5 @@
 import { getDatabase } from './db'
+import { syncService } from './syncService'
 
 export const storageService = {
   // Get storage counts for dashboard display
@@ -60,6 +61,12 @@ export const storageService = {
       for (const b of data.stores.question_bank) await tx.objectStore('question_bank').put(b)
     }
     await tx.done
+    // Non-blocking trigger to synchronize imported records
+    try {
+      syncService.triggerDebouncedSync()
+    } catch {
+      // ignore
+    }
     return true
   }
 }

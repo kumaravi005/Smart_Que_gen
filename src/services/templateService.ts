@@ -1,6 +1,8 @@
 import { getDatabase } from './db'
 import type { PaperSetupTemplate, ExamSettings, VisualLayout } from '../types'
-import { generateId } from '../utils/id'
+import { generateUuid } from '../utils/uuid'
+import { syncQueue } from './syncQueue'
+import { syncService } from './syncService'
 
 export const templateService = {
   // Get all templates (with auto-seeding on initial setup only)
@@ -32,7 +34,7 @@ export const templateService = {
     const { id: _lId, paperId: _lpId, createdAt: _lc, updatedAt: _lu, ...layoutData } = params.layout
 
     const template: PaperSetupTemplate = {
-      id: generateId('tpl'),
+      id: generateUuid(),
       name: params.name.trim(),
       description: params.description?.trim(),
       subject: params.settings.subject,
@@ -45,6 +47,8 @@ export const templateService = {
     }
 
     await db.put('templates', template)
+    await syncQueue.enqueueChange('template', template.id, 'upsert', template)
+    syncService.triggerDebouncedSync()
     return template
   },
 
@@ -52,6 +56,8 @@ export const templateService = {
   async deleteTemplate(id: string): Promise<boolean> {
     const db = await getDatabase()
     await db.delete('templates', id)
+    await syncQueue.enqueueChange('template', id, 'delete')
+    syncService.triggerDebouncedSync()
     return true
   },
 

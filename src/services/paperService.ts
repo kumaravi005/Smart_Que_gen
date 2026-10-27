@@ -8,7 +8,9 @@ import type {
   ExamSectionConfig,
   PaperSetupTemplate
 } from '../types'
-import { generateId } from '../utils/id'
+import { generateUuid } from '../utils/uuid'
+import { syncQueue } from './syncQueue'
+import { syncService } from './syncService'
 
 export const paperService = {
   // Get list of all paper drafts/metadata
@@ -100,10 +102,10 @@ export const paperService = {
     const db = await getDatabase()
     const now = new Date().toISOString()
 
-    const paperId = generateId('paper')
-    const examSettingsId = generateId('setting')
-    const contentId = generateId('content')
-    const visualLayoutId = generateId('layout')
+    const paperId = generateUuid()
+    const examSettingsId = generateUuid()
+    const contentId = generateUuid()
+    const visualLayoutId = generateUuid()
 
     const subject = params?.subject || 'Mathematics'
     const className = params?.className || 'Class X'
@@ -289,6 +291,9 @@ export const paperService = {
     await tx.objectStore('visual_layouts').put(layout)
     await tx.done
 
+    await syncQueue.enqueueChange('paper', paperId, 'upsert', metadata)
+    syncService.triggerDebouncedSync()
+
     return { metadata, settings, content, layout }
   },
 
@@ -297,6 +302,9 @@ export const paperService = {
     const db = await getDatabase()
     metadata.updatedAt = new Date().toISOString()
     await db.put('papers', metadata)
+
+    await syncQueue.enqueueChange('paper', metadata.id, 'upsert', metadata)
+    syncService.triggerDebouncedSync()
   },
 
   // Update exam settings
@@ -318,7 +326,11 @@ export const paperService = {
       }
       meta.updatedAt = settings.updatedAt
       await db.put('papers', meta)
+      await syncQueue.enqueueChange('paper', meta.id, 'upsert', meta)
     }
+
+    await syncQueue.enqueueChange('settings', settings.id, 'upsert', settings)
+    syncService.triggerDebouncedSync()
   },
 
   // Update paper content
@@ -345,7 +357,11 @@ export const paperService = {
       meta.totalQuestions = totalQuestions
       meta.updatedAt = content.updatedAt
       await db.put('papers', meta)
+      await syncQueue.enqueueChange('paper', meta.id, 'upsert', meta)
     }
+
+    await syncQueue.enqueueChange('content', content.id, 'upsert', content)
+    syncService.triggerDebouncedSync()
   },
 
   // Update visual layout
@@ -353,6 +369,9 @@ export const paperService = {
     const db = await getDatabase()
     layout.updatedAt = new Date().toISOString()
     await db.put('visual_layouts', layout)
+
+    await syncQueue.enqueueChange('layout', layout.id, 'upsert', layout)
+    syncService.triggerDebouncedSync()
   },
 
   // Duplicate an existing paper setup
@@ -363,10 +382,10 @@ export const paperService = {
     const db = await getDatabase()
     const now = new Date().toISOString()
 
-    const newPaperId = generateId('paper')
-    const newSettingsId = generateId('setting')
-    const newContentId = generateId('content')
-    const newLayoutId = generateId('layout')
+    const newPaperId = generateUuid()
+    const newSettingsId = generateUuid()
+    const newContentId = generateUuid()
+    const newLayoutId = generateUuid()
 
     const newSettings: ExamSettings = {
       ...original.settings,
@@ -383,7 +402,7 @@ export const paperService = {
       paperId: newPaperId,
       sections: original.content.sections.map(s => ({
         ...s,
-        questions: s.questions.map(q => ({ ...q, id: generateId('q') }))
+        questions: s.questions.map(q => ({ ...q, id: generateUuid() }))
       })),
       createdAt: now,
       updatedAt: now
@@ -414,6 +433,9 @@ export const paperService = {
     await tx.objectStore('paper_contents').put(newContent)
     await tx.objectStore('visual_layouts').put(newLayout)
     await tx.done
+
+    await syncQueue.enqueueChange('paper', newPaperId, 'upsert', newMetadata)
+    syncService.triggerDebouncedSync()
 
     return { metadata: newMetadata, settings: newSettings, content: newContent, layout: newLayout }
   },
@@ -472,6 +494,10 @@ export const paperService = {
     await tx.objectStore('paper_contents').delete(metadata.contentId)
     await tx.objectStore('visual_layouts').delete(metadata.visualLayoutId)
     await tx.done
+
+    await syncQueue.enqueueChange('paper', paperId, 'delete')
+    syncService.triggerDebouncedSync()
+
     return true
   }
 }

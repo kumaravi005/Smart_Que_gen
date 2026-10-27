@@ -21,6 +21,7 @@ import {
 } from 'lucide-react'
 
 import { bankService } from '../services/bankService'
+import { syncService } from '../services/syncService'
 import { Button } from '../components/common/Button'
 import { Badge } from '../components/common/Badge'
 import { Modal } from '../components/common/Modal'
@@ -50,6 +51,7 @@ export const QuestionBankView: React.FC = () => {
   const [folderNameInput, setFolderNameInput] = useState('')
   const [folderColorInput, setFolderColorInput] = useState('emerald')
   const [editingFolder, setEditingFolder] = useState<BankFolder | null>(null)
+  const [isSavingFolder, setIsSavingFolder] = useState(false)
 
   const [isBulkModalOpen, setIsBulkModalOpen] = useState(false)
   const [bulkRawText, setBulkRawText] = useState('')
@@ -118,6 +120,12 @@ export const QuestionBankView: React.FC = () => {
 
   useEffect(() => {
     loadData()
+    const unsub = syncService.subscribe((state) => {
+      if (state.status === 'idle') {
+        loadData()
+      }
+    })
+    return () => unsub()
   }, [currentFolderId, includeSubfolders, search, selectedType, selectedDifficulty])
 
   // Current subfolders
@@ -127,25 +135,30 @@ export const QuestionBankView: React.FC = () => {
   // Handle Folder Creation or Update
   const handleSaveFolder = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!folderNameInput.trim()) return
+    if (!folderNameInput.trim() || isSavingFolder) return
 
-    if (editingFolder) {
-      await bankService.updateFolder(editingFolder.id, {
-        name: folderNameInput.trim(),
-        color: folderColorInput
-      })
-    } else {
-      await bankService.createFolder({
-        name: folderNameInput.trim(),
-        parentId: currentFolderId,
-        color: folderColorInput
-      })
+    setIsSavingFolder(true)
+    try {
+      if (editingFolder) {
+        await bankService.updateFolder(editingFolder.id, {
+          name: folderNameInput.trim(),
+          color: folderColorInput
+        })
+      } else {
+        await bankService.createFolder({
+          name: folderNameInput.trim(),
+          parentId: currentFolderId,
+          color: folderColorInput
+        })
+      }
+
+      setFolderNameInput('')
+      setEditingFolder(null)
+      setIsFolderModalOpen(false)
+      await loadData()
+    } finally {
+      setIsSavingFolder(false)
     }
-
-    setFolderNameInput('')
-    setEditingFolder(null)
-    setIsFolderModalOpen(false)
-    await loadData()
   }
 
   // Handle Delete Folder
@@ -912,8 +925,13 @@ export const QuestionBankView: React.FC = () => {
             <Button type="button" variant="ghost" size="sm" onClick={() => setIsFolderModalOpen(false)}>
               Cancel
             </Button>
-            <Button type="submit" variant="primary" size="sm">
-              {editingFolder ? 'Update Folder' : 'Create Folder'}
+            <Button
+              type="submit"
+              variant="primary"
+              size="sm"
+              disabled={isSavingFolder || !folderNameInput.trim()}
+            >
+              {isSavingFolder ? 'Saving...' : (editingFolder ? 'Update Folder' : 'Create Folder')}
             </Button>
           </div>
         </form>

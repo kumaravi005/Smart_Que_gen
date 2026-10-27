@@ -1,5 +1,16 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb'
-import type { PaperMetadata, ExamSettings, PaperContent, VisualLayout, QuestionBankItem, PaperSetupTemplate, BankFolder } from '../types'
+import type {
+  PaperMetadata,
+  ExamSettings,
+  PaperContent,
+  VisualLayout,
+  QuestionBankItem,
+  PaperSetupTemplate,
+  BankFolder,
+  SyncQueueItem,
+  SyncMetadata,
+  SyncTombstone
+} from '../types'
 import { generateId } from '../utils/id'
 
 export interface OmegaDB extends DBSchema {
@@ -60,10 +71,32 @@ export interface OmegaDB extends DBSchema {
     key: string
     value: any
   }
+  sync_queue: {
+    key: string
+    value: SyncQueueItem
+    indexes: {
+      'by-timestamp': string
+      'by-entity': string
+    }
+  }
+  sync_metadata: {
+    key: string
+    value: SyncMetadata
+    indexes: {
+      'by-cloud-id': string
+    }
+  }
+  sync_tombstones: {
+    key: string
+    value: SyncTombstone
+    indexes: {
+      'by-entity-type': string
+    }
+  }
 }
 
 const DB_NAME = 'omega_paper_gen_db'
-const DB_VERSION = 3
+const DB_VERSION = 4
 
 let dbPromise: Promise<IDBPDatabase<OmegaDB>> | null = null
 
@@ -120,6 +153,25 @@ export function getDatabase(): Promise<IDBPDatabase<OmegaDB>> {
         // 8. App Settings Store
         if (!db.objectStoreNames.contains('app_settings')) {
           db.createObjectStore('app_settings', { keyPath: 'key' })
+        }
+
+        // 9. Sync Queue Store (Offline-First Outbox)
+        if (!db.objectStoreNames.contains('sync_queue')) {
+          const queueStore = db.createObjectStore('sync_queue', { keyPath: 'id' })
+          queueStore.createIndex('by-timestamp', 'timestamp')
+          queueStore.createIndex('by-entity', 'entityType')
+        }
+
+        // 10. Sync Metadata Store (Entity tracking & UUID mapping)
+        if (!db.objectStoreNames.contains('sync_metadata')) {
+          const metaStore = db.createObjectStore('sync_metadata', { keyPath: 'id' })
+          metaStore.createIndex('by-cloud-id', 'cloudId')
+        }
+
+        // 11. Sync Tombstones Store (Tracking deletions offline)
+        if (!db.objectStoreNames.contains('sync_tombstones')) {
+          const tombstoneStore = db.createObjectStore('sync_tombstones', { keyPath: 'id' })
+          tombstoneStore.createIndex('by-entity-type', 'entityType')
         }
       }
     })

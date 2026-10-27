@@ -1,13 +1,21 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Outlet } from 'react-router-dom'
 import { Header } from './Header'
 import { Sidebar } from './Sidebar'
 import { MobileNav } from './MobileNav'
 import { CreatePaperModal } from '../common/CreatePaperModal'
+import { syncService } from '../../services/syncService'
 
 export const AppLayout: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [createModalOpen, setCreateModalOpen] = useState(false)
+
+  useEffect(() => {
+    syncService.init()
+    return () => {
+      syncService.unsubscribeRealtime()
+    }
+  }, [])
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans text-slate-800 antialiased overflow-x-clip selection:bg-[#0055D4] selection:text-white">

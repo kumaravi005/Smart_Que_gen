@@ -1,22 +1,121 @@
 import { getDatabase } from './db'
 import type { QuestionBankItem, BankFilter, BankFolder } from '../types'
-import { generateId } from '../utils/id'
+import { generateUuid, isValidUuid } from '../utils/uuid'
+import { syncQueue } from './syncQueue'
+import { syncService } from './syncService'
+import { supabase, isSupabaseConfigured } from './supabaseClient'
 
 export const bankService = {
   // --- Folder Management ---
 
-  // Get all question bank folders
+  // Get all question bank folders (with automatic deduplication for legacy sync duplicates)
   async getFolders(): Promise<BankFolder[]> {
     const db = await getDatabase()
+    let rawFolders: BankFolder[] = []
     try {
       if (db.objectStoreNames.contains('bank_folders')) {
-        return await db.getAll('bank_folders')
+        rawFolders = await db.getAll('bank_folders')
       }
     } catch {
       // Fallback
     }
-    const setting = await db.get('app_settings', 'bank_folders_list')
-    return setting?.value || []
+
+    if (rawFolders.length === 0) {
+      const setting = await db.get('app_settings', 'bank_folders_list')
+      rawFolders = setting?.value || []
+    }
+
+    // Deduplicate folders by key: `${parentId || 'root'}:${name.trim().toLowerCase()}`
+    const seen = new Map<string, BankFolder>()
+    const duplicatesToDelete: string[] = []
+    const migrations = new Map<string, string>() // discardedId -> keptId
+
+    for (const f of rawFolders) {
+      const key = `${f.parentId || 'root'}:${f.name.trim().toLowerCase()}`
+      if (!seen.has(key)) {
+        seen.set(key, f)
+      } else {
+        const existing = seen.get(key)!
+        const existingIsUuid = isValidUuid(existing.id)
+        const currentIsUuid = isValidUuid(f.id)
+
+        let keep: BankFolder
+        let discard: BankFolder
+
+        if (currentIsUuid && !existingIsUuid) {
+          keep = f
+          discard = existing
+          seen.set(key, f)
+        } else if (!currentIsUuid && existingIsUuid) {
+          keep = existing
+          discard = f
+        } else {
+          // If both or neither are UUIDs, keep newer updatedAt
+          const existingTime = new Date(existing.updatedAt || 0).getTime()
+          const currentTime = new Date(f.updatedAt || 0).getTime()
+          if (currentTime >= existingTime) {
+            keep = f
+            discard = existing
+            seen.set(key, f)
+          } else {
+            keep = existing
+            discard = f
+          }
+        }
+
+        duplicatesToDelete.push(discard.id)
+        migrations.set(discard.id, keep.id)
+      }
+    }
+
+      // If duplicate folders were detected, clean up IndexedDB and re-point any questions
+    if (duplicatesToDelete.length > 0) {
+      try {
+        const tx = db.transaction(['bank_folders', 'question_bank'], 'readwrite')
+        for (const delId of duplicatesToDelete) {
+          await tx.objectStore('bank_folders').delete(delId)
+        }
+
+        const allQuestions: QuestionBankItem[] = await tx.objectStore('question_bank').getAll()
+        for (const q of allQuestions) {
+          if (q.folderId && migrations.has(q.folderId)) {
+            q.folderId = migrations.get(q.folderId)!
+            await tx.objectStore('question_bank').put(q)
+          }
+        }
+        await tx.done
+      } catch (err) {
+        console.warn('Error during folder deduplication:', err)
+      }
+
+      // Also ensure Supabase cloud is cleaned of discarded duplicates so they don't get pulled back
+      for (const delId of duplicatesToDelete) {
+        syncQueue.enqueueChange('folder', delId, 'delete').catch(() => {})
+        if (supabase && isSupabaseConfigured) {
+          const now = new Date().toISOString()
+          supabase
+            .from('bank_folders')
+            .update({ deleted_at: now })
+            .eq('id', delId)
+            .then(() => {}, () => {})
+
+          const keptId = migrations.get(delId)
+          if (keptId) {
+            supabase
+              .from('question_bank')
+              .update({ folder_id: keptId })
+              .eq('folder_id', delId)
+              .then(() => {}, () => {})
+          }
+        }
+      }
+
+      const deduplicatedList = Array.from(seen.values())
+      await db.put('app_settings', { key: 'bank_folders_list', value: deduplicatedList })
+      return deduplicatedList
+    }
+
+    return Array.from(seen.values())
   },
 
   // Get single folder by ID
@@ -34,10 +133,23 @@ export const bankService = {
   }): Promise<BankFolder> {
     const db = await getDatabase()
     const now = new Date().toISOString()
+    const trimmedName = data.name.trim()
+    const parentId = data.parentId || null
+
+    // Prevent creating duplicate folder with identical name inside the same parent
+    const existingFolders = await this.getFolders()
+    const existingDuplicate = existingFolders.find(
+      f => f.name.trim().toLowerCase() === trimmedName.toLowerCase() && (f.parentId || null) === parentId
+    )
+    if (existingDuplicate) {
+      return existingDuplicate
+    }
+
+    // Use standard UUID directly so local ID and cloud ID match 100%
     const newFolder: BankFolder = {
-      id: generateId('folder'),
-      name: data.name.trim(),
-      parentId: data.parentId || null,
+      id: generateUuid(),
+      name: trimmedName,
+      parentId,
       color: data.color || 'emerald',
       description: data.description?.trim(),
       createdAt: now,
@@ -47,15 +159,20 @@ export const bankService = {
     try {
       if (db.objectStoreNames.contains('bank_folders')) {
         await db.put('bank_folders', newFolder)
-        return newFolder
       }
     } catch {
       // Fallback
     }
 
     const folders = await this.getFolders()
-    folders.push(newFolder)
-    await db.put('app_settings', { key: 'bank_folders_list', value: folders })
+    if (!folders.some(f => f.id === newFolder.id)) {
+      folders.push(newFolder)
+      await db.put('app_settings', { key: 'bank_folders_list', value: folders })
+    }
+
+    await syncQueue.enqueueChange('folder', newFolder.id, 'upsert', newFolder)
+    syncService.triggerDebouncedSync()
+
     return newFolder
   },
 
@@ -75,7 +192,6 @@ export const bankService = {
     try {
       if (db.objectStoreNames.contains('bank_folders')) {
         await db.put('bank_folders', updated)
-        return updated
       }
     } catch {
       // Fallback
@@ -83,6 +199,10 @@ export const bankService = {
 
     folders[idx] = updated
     await db.put('app_settings', { key: 'bank_folders_list', value: folders })
+
+    await syncQueue.enqueueChange('folder', updated.id, 'upsert', updated)
+    syncService.triggerDebouncedSync()
+
     return updated
   },
 
@@ -123,13 +243,21 @@ export const bankService = {
       if (q.folderId && folderIdsToDelete.includes(q.folderId)) {
         if (deleteContents) {
           await txQ.store.delete(q.id)
+          syncQueue.enqueueChange('question', q.id, 'delete').catch(() => {})
         } else {
           // Unlink to root
-          await txQ.store.put({ ...q, folderId: null, updatedAt: new Date().toISOString() })
+          const unlinked = { ...q, folderId: null, updatedAt: new Date().toISOString() }
+          await txQ.store.put(unlinked)
+          syncQueue.enqueueChange('question', q.id, 'upsert', unlinked).catch(() => {})
         }
       }
     }
     await txQ.done
+
+    for (const fId of folderIdsToDelete) {
+      await syncQueue.enqueueChange('folder', fId, 'delete')
+    }
+    syncService.triggerDebouncedSync()
 
     return true
   },
@@ -244,12 +372,16 @@ export const bankService = {
     const now = new Date().toISOString()
     const newItem: QuestionBankItem = {
       ...item,
-      id: generateId('qb'),
+      id: generateUuid(),
       usageCount: 0,
       createdAt: now,
       updatedAt: now
     }
     await db.put('question_bank', newItem)
+
+    await syncQueue.enqueueChange('question', newItem.id, 'upsert', newItem)
+    syncService.triggerDebouncedSync()
+
     return newItem
   },
 
@@ -265,7 +397,7 @@ export const bankService = {
     for (const item of items) {
       const newItem: QuestionBankItem = {
         ...item,
-        id: generateId('qb'),
+        id: generateUuid(),
         usageCount: 0,
         createdAt: now,
         updatedAt: now
@@ -274,6 +406,11 @@ export const bankService = {
       createdItems.push(newItem)
     }
     await tx.done
+
+    for (const created of createdItems) {
+      await syncQueue.enqueueChange('question', created.id, 'upsert', created)
+    }
+    syncService.triggerDebouncedSync()
 
     return createdItems
   },
@@ -290,6 +427,10 @@ export const bankService = {
       updatedAt: new Date().toISOString()
     }
     await db.put('question_bank', updated)
+
+    await syncQueue.enqueueChange('question', updated.id, 'upsert', updated)
+    syncService.triggerDebouncedSync()
+
     return updated
   },
 
@@ -303,9 +444,11 @@ export const bankService = {
         item.folderId = targetFolderId
         item.updatedAt = new Date().toISOString()
         await tx.store.put(item)
+        await syncQueue.enqueueChange('question', item.id, 'upsert', item)
       }
     }
     await tx.done
+    syncService.triggerDebouncedSync()
   },
 
   // Increment usage count when imported into a paper
@@ -316,6 +459,8 @@ export const bankService = {
       item.usageCount += 1
       item.updatedAt = new Date().toISOString()
       await db.put('question_bank', item)
+      await syncQueue.enqueueChange('question', item.id, 'upsert', item)
+      syncService.triggerDebouncedSync()
     }
   },
 
@@ -323,6 +468,8 @@ export const bankService = {
   async deleteQuestion(id: string): Promise<boolean> {
     const db = await getDatabase()
     await db.delete('question_bank', id)
+    await syncQueue.enqueueChange('question', id, 'delete')
+    syncService.triggerDebouncedSync()
     return true
   },
 
@@ -332,8 +479,10 @@ export const bankService = {
     const tx = db.transaction('question_bank', 'readwrite')
     for (const id of ids) {
       await tx.store.delete(id)
+      await syncQueue.enqueueChange('question', id, 'delete')
     }
     await tx.done
+    syncService.triggerDebouncedSync()
     return true
   }
 }

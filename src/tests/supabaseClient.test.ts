@@ -31,22 +31,26 @@ describe('Supabase Client & Safe Connection Diagnostics', () => {
     }
   })
 
-  it('testSupabaseConnection executes non-destructively and never throws', async () => {
-    const result = await testSupabaseConnection(8000)
-    expect(result).toBeDefined()
-    expect(typeof result.configured).toBe('boolean')
-    expect(typeof result.reachable).toBe('boolean')
-    expect(typeof result.message).toBe('string')
+  it(
+    'testSupabaseConnection executes non-destructively and never throws',
+    async () => {
+      const result = await testSupabaseConnection(8000)
+      expect(result).toBeDefined()
+      expect(typeof result.configured).toBe('boolean')
+      expect(typeof result.reachable).toBe('boolean')
+      expect(typeof result.message).toBe('string')
 
-    // If configured via .env.local, it should safely return connection status
-    if (result.configured) {
-      expect(['connected', 'tables_missing', 'unreachable']).toContain(result.status)
-      if (result.status === 'connected') {
-        expect(result.reachable).toBe(true)
-        expect(result.hasTables).toBe(true)
+      // If configured via .env.local, it should safely return connection status
+      if (result.configured) {
+        expect(['connected', 'tables_missing', 'unreachable']).toContain(result.status)
+        if (result.status === 'connected') {
+          expect(result.reachable).toBe(true)
+          expect(result.hasTables).toBe(true)
+        }
+      } else {
+        expect(result.status).toBe('unconfigured')
       }
-    } else {
-      expect(result.status).toBe('unconfigured')
-    }
-  })
+    },
+    15000
+  )
 })
