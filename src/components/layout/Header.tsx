@@ -104,15 +104,17 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onOpenCreateMod
                 </div>
               )}
 
-              <Button
-                variant="primary"
-                size="sm"
-                leftIcon={<Plus className="w-4 h-4" />}
-                onClick={onOpenCreateModal}
-                className="hidden sm:inline-flex shadow-xs"
-              >
-                New Paper
-              </Button>
+              <div className="hidden lg:block">
+                <Button
+                  variant="omega"
+                  size="sm"
+                  leftIcon={<Plus className="w-4 h-4 text-blue-950" />}
+                  onClick={onOpenCreateModal}
+                  className="shadow-xs"
+                >
+                  New Paper
+                </Button>
+              </div>
             </div>
           </div>
         </div>

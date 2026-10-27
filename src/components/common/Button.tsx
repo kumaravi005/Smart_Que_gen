@@ -2,7 +2,7 @@ import React from 'react'
 import { Loader2 } from 'lucide-react'
 
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger'
+  variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger' | 'omega'
   size?: 'sm' | 'md' | 'lg'
   isLoading?: boolean
   leftIcon?: React.ReactNode
@@ -25,15 +25,17 @@ export const Button: React.FC<ButtonProps> = ({
 
   const variants = {
     primary:
-      'bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white shadow-sm hover:shadow shadow-blue-500/20 focus:ring-blue-500 border border-transparent',
+      'bg-[#0055D4] hover:bg-[#0041a8] active:bg-[#00358a] text-white shadow-xs hover:shadow focus:ring-[#0055D4] border border-transparent font-semibold',
+    omega:
+      'bg-[#FFE600] hover:bg-[#f2db00] active:bg-[#e0cb00] text-blue-950 font-bold border border-yellow-400 shadow-xs focus:ring-[#FFE600]',
     secondary:
-      'bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-800 focus:ring-slate-400 border border-transparent',
+      'bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-800 focus:ring-slate-400 border border-transparent font-medium',
     outline:
-      'border border-slate-300 hover:border-slate-400 bg-white hover:bg-slate-50 text-slate-700 focus:ring-blue-500 shadow-xs',
+      'border border-slate-300 hover:border-slate-400 bg-white hover:bg-slate-50 text-slate-700 focus:ring-[#0055D4] shadow-xs font-medium',
     ghost:
-      'text-slate-600 hover:text-slate-900 hover:bg-slate-100/80 active:bg-slate-200 focus:ring-slate-400',
+      'text-slate-600 hover:text-slate-900 hover:bg-slate-100/80 active:bg-slate-200 focus:ring-slate-400 font-medium',
     danger:
-      'bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white shadow-sm focus:ring-rose-500 border border-transparent'
+      'bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white shadow-sm focus:ring-rose-500 border border-transparent font-medium'
   }
 
   // Ensure minimum 44px tap target on mobile for primary touch usability

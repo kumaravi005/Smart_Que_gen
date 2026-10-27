@@ -90,7 +90,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
   const linkClass = ({ isActive }: { isActive: boolean }) =>
     `flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-medium transition-all group ${
       isActive
-        ? 'bg-blue-600 text-white shadow-xs font-semibold'
+        ? 'bg-[#0055D4] text-white shadow-xs font-semibold'
         : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/90'
     }`
 

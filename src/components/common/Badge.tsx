@@ -1,6 +1,6 @@
 import React from 'react'
 
-export type BadgeVariant = 'default' | 'primary' | 'success' | 'warning' | 'info' | 'purple'
+export type BadgeVariant = 'default' | 'primary' | 'success' | 'warning' | 'info' | 'purple' | 'omega'
 
 interface BadgeProps {
   children: React.ReactNode
@@ -17,8 +17,9 @@ export const Badge: React.FC<BadgeProps> = ({
 }) => {
   const variantStyles = {
     default: 'bg-slate-100 text-slate-700 border-slate-200',
-    primary: 'bg-blue-50 text-blue-700 border-blue-200',
-    success: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    primary: 'bg-blue-50 text-[#0055D4] border-blue-200 font-semibold',
+    omega: 'bg-[#FFE600] text-blue-950 border-yellow-400 font-bold',
+    success: 'bg-emerald-50 text-[#047857] border-emerald-200 font-medium',
     warning: 'bg-amber-50 text-amber-800 border-amber-200',
     info: 'bg-cyan-50 text-cyan-700 border-cyan-200',
     purple: 'bg-purple-50 text-purple-700 border-purple-200'
