@@ -35,4 +35,26 @@ describe('FormattedMathText Component', () => {
     expect(html).toContain('2')
     expect(html).toContain('+ 1)')
   })
+
+  it('renders vertical fractions with subscripts and not equal operator (Screenshot 2)', () => {
+    const html = renderToString(React.createElement(FormattedMathText, { text: 'a₁/a₂ ≠ b₁/b₂', isOption: true }))
+    expect(html).toContain('border-b')
+    expect(html).toContain('a')
+    expect(html).toContain('b')
+    expect(html).toContain('≠')
+  })
+
+  it('renders quadratic equation variables and inequality options (Screenshot 1)', () => {
+    const html = renderToString(React.createElement(FormattedMathText, { text: 'ax² + bx + c = 0' }))
+    expect(html).toContain('ax')
+    expect(html).toContain('<sup')
+    expect(html).toContain('2</sup>')
+    expect(html).toContain('bx')
+    expect(html).toContain('c')
+
+    const optHtml = renderToString(React.createElement(FormattedMathText, { text: 'a ≠ 0', isOption: true }))
+    expect(optHtml).toContain('a')
+    expect(optHtml).toContain('≠')
+    expect(optHtml).toContain('0')
+  })
 })

@@ -38,10 +38,33 @@ const SUPERSCRIPT_CHARS: Record<string, string> = {
   '⁻': '-'
 }
 
+const SUBSCRIPT_CHARS: Record<string, string> = {
+  '₀': '0',
+  '₁': '1',
+  '₂': '2',
+  '₃': '3',
+  '₄': '4',
+  '₅': '5',
+  '₆': '6',
+  '₇': '7',
+  '₈': '8',
+  '₉': '9',
+  'ₐ': 'a',
+  'ₑ': 'e',
+  'ₒ': 'o',
+  'ₓ': 'x',
+  'ₙ': 'n',
+  'ᵢ': 'i',
+  'ⱼ': 'j',
+  'ₖ': 'k',
+  '₊': '+',
+  '₋': '-'
+}
+
 /**
  * Tokenizes text into mathematical structures:
  * - Bracketed fractions with exponents: [n(n+1)/2]², (a/b)^2
- * - Standard fractions: n(n+1)(2n+1)/6, 1/2, (a+b)/(c+d)
+ * - Standard fractions: n(n+1)(2n+1)/6, 1/2, a₁/a₂, (a+b)/(c+d)
  * - Plain and inline mathematical text
  */
 function tokenizeMathText(text: string): MathToken[] {
@@ -52,11 +75,11 @@ function tokenizeMathText(text: string): MathToken[] {
 
   // 1. Bracketed fractions with optional powers: e.g. [n(n + 1)/2]² or (n(n + 1)/2)^2
   const bracketedFracRegex =
-    /([\[\(])\s*([^/\[\]\(\)]+(?:\([^)]*\)[^/\[\]\(\)]*)*)\s*\/\s*([^/\[\]\(\)]+(?:\([^)]*\)[^/\[\]\(\)]*)*)\s*([\]\)])(?:\s*([\^²³⁴⁰¹⁵⁶⁷⁸⁹\d+n-]+))?/g
+    /([\[\(])\s*([^/\[\]\(\)]+(?:\([^)]*\)[^/\[\]\(\)]*)*)\s*\/\s*([^/\[\]\(\)]+(?:\([^)]*\)[^/\[\]\(\)]*)*)\s*([\]\)])(?:\s*([\^²³⁴⁰¹⁵⁶⁷⁸⁹₀₁₂₃₄₅₆₇₈₉\d+n-]+))?/g
 
-  // 2. Standard fractions: e.g. n(n + 1)(2n + 1)/6, n(n + 1)/2, 1/2, (a + b)/(c + d)
+  // 2. Standard fractions: e.g. n(n + 1)(2n + 1)/6, n(n + 1)/2, 1/2, a₁/a₂, (a + b)/(c + d)
   const fractionRegex =
-    /(?:(\([^)]+\)|[a-zA-Z0-9\u0900-\u097F²³⁴⁰¹⁵⁶⁷⁸⁹√]+(?:\([^)]*\))*[a-zA-Z0-9\u0900-\u097F²³⁴⁰¹⁵⁶⁷⁸⁹√]*))\s*\/\s*(?:(\([^)]+\)|[a-zA-Z0-9\u0900-\u097F²³⁴⁰¹⁵⁶⁷⁸⁹√]+))/g
+    /(?:(\([^)]+\)|[a-zA-Z0-9\u0900-\u097F²³⁴⁰¹⁵⁶⁷⁸⁹₀₁₂₃₄₅₆₇₈₉ₐₑₒₓₙᵢⱼₖ√]+(?:\([^)]*\))*[a-zA-Z0-9\u0900-\u097F²³⁴⁰¹⁵⁶⁷⁸⁹₀₁₂₃₄₅₆₇₈₉ₐₑₒₓₙᵢⱼₖ√]*))\s*\/\s*(?:(\([^)]+\)|[a-zA-Z0-9\u0900-\u097F²³⁴⁰¹⁵⁶⁷⁸⁹₀₁₂₃₄₅₆₇₈₉ₐₑₒₓₙᵢⱼₖ√]+))/g
 
   const matches: MathToken[] = []
 
@@ -135,20 +158,20 @@ function cleanTerm(str: string): string {
 }
 
 /**
- * Renders an inline text segment, italicizing isolated math variables (e.g. n, x)
- * and styling superscripts cleanly.
+ * Renders an inline text segment, italicizing isolated math variables (e.g. n, x, ax, bx, a, b, c)
+ * and styling superscripts, subscripts, and comparison symbols cleanly.
  */
 const InlineTextSegment: React.FC<{ content: string; mathSerif?: boolean }> = ({ content, mathSerif = true }) => {
-  // Regex splitting isolated single-letter math variables, powers, and plain words
-  // e.g. "66. प्रथम n प्राकृतिक संख्याओं का योगफल है—"
   const parts = useMemo(() => {
     // Matches:
-    // 1. Isolated single Latin variable: e.g. " n ", "(n)"
-    // 2. Superscript digits: e.g. "²", "³"
-    // 3. Normal text
-    const tokenRegex = /(?:(?<=^|[\s\u0900-\u097F,\(])([a-zA-Z])(?=[\s\u0900-\u097F,\)\.\—\:\-]|$)|([⁰¹²³⁴⁵⁶⁷⁸⁹ⁿ⁺⁻]+))/g
+    // 1. Math variable sequences (1-2 Latin letters in math context): e.g. "ax", "bx", "a", "b", "c", "x", "n"
+    // 2. Superscript characters: e.g. "²", "³"
+    // 3. Subscript characters: e.g. "₁", "₂"
+    // 4. Comparison/Inequality operators: e.g. "≠", "≤", "≥"
+    const tokenRegex =
+      /(?:(?<=^|[\s\u0900-\u097F,\(=≠<>+\-])([a-zA-Z]{1,2})(?=[\s\u0900-\u097F,\)\.\—\:\-=≠<>+\-₀₁₂₃₄₅₆₇₈₉²³⁴¹⁰⁵⁶⁷⁸⁹]|$)|([⁰¹²³⁴⁵⁶⁷⁸⁹ⁿ⁺⁻]+)|([₀₁₂₃₄₅₆₇₈₉ₐₑₒₓₙᵢⱼₖ]+)|(≠|≤|≥))/g
 
-    const res: Array<{ type: 'var' | 'sup' | 'plain'; text: string }> = []
+    const res: Array<{ type: 'var' | 'sup' | 'sub' | 'op' | 'plain'; text: string }> = []
     let lastIdx = 0
     let match: RegExpExecArray | null
 
@@ -160,6 +183,10 @@ const InlineTextSegment: React.FC<{ content: string; mathSerif?: boolean }> = ({
         res.push({ type: 'var', text: match[1] })
       } else if (match[2]) {
         res.push({ type: 'sup', text: match[2] })
+      } else if (match[3]) {
+        res.push({ type: 'sub', text: match[3] })
+      } else if (match[4]) {
+        res.push({ type: 'op', text: match[4] })
       }
       lastIdx = match.index + match[0].length
     }
@@ -193,6 +220,24 @@ const InlineTextSegment: React.FC<{ content: string; mathSerif?: boolean }> = ({
             <sup key={idx} className="font-sans font-bold text-[0.78em] leading-none -top-1 ml-0.5">
               {normalPower}
             </sup>
+          )
+        }
+        if (p.type === 'sub') {
+          const normalSub = p.text
+            .split('')
+            .map(ch => SUBSCRIPT_CHARS[ch] || ch)
+            .join('')
+          return (
+            <sub key={idx} className="font-sans font-medium text-[0.78em] leading-none align-sub ml-px">
+              {normalSub}
+            </sub>
+          )
+        }
+        if (p.type === 'op') {
+          return (
+            <span key={idx} className="font-semibold text-slate-900 mx-1 select-text">
+              {p.text}
+            </span>
           )
         }
         return <span key={idx}>{p.text}</span>

@@ -310,10 +310,10 @@ export function cleanMathAndStructuredText(input: string): string {
   text = text.replace(/\\cdot(?![a-zA-Z])/g, '·')
   text = text.replace(/\\bullet(?![a-zA-Z])/g, '•')
   text = text.replace(/\\ast(?![a-zA-Z])/g, '*')
-  text = text.replace(/\\star(?![a-zA-Z])/g, '*')
-  text = text.replace(/\\le(?![a-zA-Z])|\\leq(?![a-zA-Z])/g, '≤')
-  text = text.replace(/\\ge(?![a-zA-Z])|\\geq(?![a-zA-Z])/g, '≥')
-  text = text.replace(/\\neq(?![a-zA-Z])|\\ne(?![a-zA-Z])/g, '≠')
+  text = text.replace(/\\leq(?![a-zA-Z])|\\le(?!(?:ft|q|arn)[a-zA-Z])\s*/g, ' ≤ ')
+  text = text.replace(/\\geq(?![a-zA-Z])|\\ge(?!(?:q|t)[a-zA-Z])\s*/g, ' ≥ ')
+  text = text.replace(/\\neq(?![a-zA-Z])|\\neq\s*/g, ' ≠ ')
+  text = text.replace(/\\ne(?!(?:g|arrow|wline)[a-zA-Z])\s*/g, ' ≠ ')
   text = text.replace(/\\approx(?![a-zA-Z])/g, '≈')
   text = text.replace(/\\equiv(?![a-zA-Z])/g, '≡')
   text = text.replace(/\\propto(?![a-zA-Z])/g, '∝')
@@ -395,6 +395,21 @@ export function cleanMathAndStructuredText(input: string): string {
 
   // Space around equals when missing spaces: e.g. "AB=10" -> "AB = 10", "A=2" -> "A = 2"
   text = text.replace(/([^\s=])\s*(?<!=)=(?!=)\s*([^\s=])/g, '$1 = $2')
+
+  // Space around inequality ≠, ≤, ≥
+  text = text.replace(/([^\s≠≤≥])\s*(≠|≤|≥)\s*([^\s≠≤≥])/g, '$1 $2 $3')
+
+  // Clean unescaped 'ne' when attached to subscripts, superscripts, or closing brackets: e.g. a₁/a₂neb₁/b₂ -> a₁/a₂ ≠ b₁/b₂
+  text = text.replace(
+    /([\u2080-\u2089\u2090-\u209C\u00B2\u00B3\u2070-\u2079\/\)\]])\s*ne\s*([a-zA-Z0-9\u2080-\u2089\u00B2\u00B3\u2074\u00B9\u2070\\(])/g,
+    (_m, p1, p2) => `${p1} ≠ ${p2}`
+  )
+
+  // Standalone whole word 'ne' between math variables or numbers: e.g. "a ne 0" -> "a ≠ 0", "x ne y" -> "x ≠ y"
+  text = text.replace(
+    /(^|[\s,(=])([a-zA-Z0-9\u2080-\u2089])\s+\bne\b\s+([a-zA-Z0-9\u2080-\u2089])(?=[\s,).—:-]|$)/g,
+    (_m, p0, p1, p2) => `${p0}${p1} ≠ ${p2}`
+  )
 
   // Space after commas: e.g. "= 2,तो" -> "= 2, तो"
   text = text.replace(/,([a-zA-Z0-9\u0900-\u097F])/g, ', $1')

@@ -219,4 +219,44 @@ Ans: B
     expect(q.options?.[3].label).toBe('D')
     expect(q.options?.[3].text).toBe('n(n - 1)/2')
   })
+
+  it('correctly structures quadratic equation question with inequality options (Screenshot 1)', () => {
+    const rawInput = `39. ax^2 + bx + c = 0 एक द्विघात समीकरण कहलाता है, जहाँ a, b, c वास्तविक संख्याएँ हैं, यदि—
+(a) a \\ne 0
+(b) b \\ne 0
+(c) c \\ne 0
+(d) a = 0`
+
+    const parsed = parseBulkQuestions(rawInput)
+    expect(parsed.length).toBe(1)
+    const q = parsed[0]
+    expect(q.type).toBe('mcq')
+    expect(q.prompt).toBe('ax² + bx + c = 0 एक द्विघात समीकरण कहलाता है, जहाँ a, b, c वास्तविक संख्याएँ हैं, यदि—')
+    expect(q.options?.length).toBe(4)
+    expect(q.options?.[0].label).toBe('A')
+    expect(q.options?.[0].text).toBe('a ≠ 0')
+    expect(q.options?.[1].label).toBe('B')
+    expect(q.options?.[1].text).toBe('b ≠ 0')
+    expect(q.options?.[2].label).toBe('C')
+    expect(q.options?.[2].text).toBe('c ≠ 0')
+    expect(q.options?.[3].label).toBe('D')
+    expect(q.options?.[3].text).toBe('a = 0')
+  })
+
+  it('correctly converts squished \\ne and cleans unescaped "ne" in ratio options (Screenshot 2)', () => {
+    const rawInput = `रैखिक समीकरणों के युग्म का आलेखीय निरूपण यदि समांतर रेखाएँ हों, तो—
+(A) a₁/a₂neb₁/b₂
+(B) a₁/a₂ = b₁/b₂ = c₁/c₂
+(C) a₁/a₂ = b₁/b₂nec₁/c₂
+(D) इनमें से कोई नहीं`
+
+    const parsed = parseBulkQuestions(rawInput)
+    expect(parsed.length).toBe(1)
+    const q = parsed[0]
+    expect(q.type).toBe('mcq')
+    expect(q.options?.[0].text).toBe('a₁/a₂ ≠ b₁/b₂')
+    expect(q.options?.[1].text).toBe('a₁/a₂ = b₁/b₂ = c₁/c₂')
+    expect(q.options?.[2].text).toBe('a₁/a₂ = b₁/b₂ ≠ c₁/c₂')
+    expect(q.options?.[3].text).toBe('इनमें से कोई नहीं')
+  })
 })
