@@ -92,6 +92,11 @@ function extractBalancedBraces(str: string, startIndex: number): { content: stri
  * Resolves LaTeX fractions (including nested and with roots) into readable 'a/b' or '(a)/b'.
  */
 function resolveFractions(text: string): string {
+  // Normalize single-token unbraced arguments: e.g. \frac1{\cot A} -> \frac{1}{\cot A}, \frac12 -> \frac{1}{2}
+  text = text.replace(/\\(?:frac|dfrac|tfrac)\s*([0-9a-zA-Z])\s*\{/g, '\\frac{$1}{')
+  text = text.replace(/\\(?:frac|dfrac|tfrac)\s*\{([^{}]+)\}\s*([0-9a-zA-Z])(?![a-zA-Z])/g, '\\frac{$1}{$2}')
+  text = text.replace(/\\(?:frac|dfrac|tfrac)\s*([0-9a-zA-Z])\s*([0-9a-zA-Z])(?![a-zA-Z])/g, '\\frac{$1}{$2}')
+
   const fracRegex = /\\(?:frac|dfrac|tfrac)\s*\{/
   let match = fracRegex.exec(text)
   while (match) {
@@ -110,8 +115,8 @@ function resolveFractions(text: string): string {
     const num = resolveFractions(cleanMathAndStructuredText(brace1.content)).trim()
     const den = resolveFractions(cleanMathAndStructuredText(brace2.content)).trim()
 
-    const numNeedsParen = /[+\-=\s]/.test(num) && !num.startsWith('(')
-    const denNeedsParen = /[+\-=\s]/.test(den) && !den.startsWith('(')
+    const numNeedsParen = /[+\-=]/.test(num) && !num.startsWith('(')
+    const denNeedsParen = /[+\-=]/.test(den) && !den.startsWith('(')
 
     const finalNum = numNeedsParen ? `(${num})` : num
     const finalDen = denNeedsParen ? `(${den})` : den
@@ -323,12 +328,21 @@ export function cleanMathAndStructuredText(input: string): string {
   text = text.replace(/\\[,;!]|\\quad\b|\\qquad\b|\\enspace\b/g, ' ')
 
   // 11. Smart mathematical spacing normalization
-  // Space around equals when missing spaces: e.g. "AB=10" -> "AB = 10", "x=5" -> "x = 5"
-  text = text.replace(/([a-zA-Z0-9\u0900-\u097Fα-ωΑ-Ω])=([a-zA-Z0-9\u0900-\u097Fα-ωΑ-Ω])/g, '$1 = $2')
+  // Space around addition + when missing: e.g. "cot A+1/cot A" -> "cot A + 1/cot A", "tan² A+1" -> "tan² A + 1"
+  text = text.replace(/([a-zA-Z0-9\u0900-\u097Fα-ωΑ-Ω²³⁴⁰¹⁵⁶⁷⁸⁹\)])\s*\+\s*([a-zA-Z0-9\u0900-\u097Fα-ωΑ-Ω\\(√])/g, '$1 + $2')
+
+  // Space around subtraction - when between terms
+  text = text.replace(/([a-zA-Z0-9α-ωΑ-Ω²³⁴⁰¹⁵⁶⁷⁸⁹\)])\s*-\s*([a-zA-Z0-9α-ωΑ-Ω\\(√])/g, '$1 - $2')
+
+  // Space around equals when missing spaces: e.g. "AB=10" -> "AB = 10", "A=2" -> "A = 2"
+  text = text.replace(/([^\s=])\s*(?<!=)=(?!=)\s*([^\s=])/g, '$1 = $2')
+
+  // Space after commas: e.g. "= 2,तो" -> "= 2, तो"
+  text = text.replace(/,([a-zA-Z0-9\u0900-\u097F])/g, ', $1')
 
   // Space around similarity operator ~: e.g. "△ABC~△PQR" -> "△ABC ~ △PQR"
-  text = text.replace(/([a-zA-Z0-9\u0900-\u097F])~([a-zA-Z0-9\u0900-\u097F△])/g, '$1 ~ $2')
-  text = text.replace(/([△][a-zA-Z0-9]+)~([△][a-zA-Z0-9]+)/g, '$1 ~ $2')
+  text = text.replace(/([a-zA-Z0-9\u0900-\u097F])\s*~\s*([a-zA-Z0-9\u0900-\u097F△])/g, '$1 ~ $2')
+  text = text.replace(/([△][a-zA-Z0-9]+)\s*~\s*([△][a-zA-Z0-9]+)/g, '$1 ~ $2')
 
   // Space before Devanagari words after math symbols / numbers if squished
   // e.g. "10सेमी" -> "10 सेमी", "40/3सेमी" -> "40/3 सेमी"

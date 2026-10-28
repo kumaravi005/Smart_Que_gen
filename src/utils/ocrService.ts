@@ -313,7 +313,7 @@ export function parseOcrQuestions(rawText: string): ExtractedOcrQuestion[] {
   // Option pattern that matches options across lines or inline:
   // e.g. o (A) 1, • (B) 2, *o (C) 3, (A) 1, [A] 1, A) 1, A. 1, (क) 1, etc.
   // Excludes decimal numbers like "1.5" from triggering an option match.
-  const optPattern = /(?:^|[\s\r\n]+)(?:[•*oO0\-–—]\s*)?(?:\(([A-Da-d1-4]|[\u0915-\u0918])\)|\[([A-Da-d1-4]|[\u0915-\u0918])\]|(?:([A-Da-d]|[\u0915-\u0918])|([1-4])(?!\.\d))[:.)\]\-]\s+)([\s\S]*?)(?=(?:[\s\r\n]+(?:[•*oO0\-–—]\s*)?(?:\(([A-Da-d1-4]|[\u0915-\u0918])\)|\[([A-Da-d1-4]|[\u0915-\u0918])\]|(?:([A-Da-d]|[\u0915-\u0918])|([1-4])(?!\.\d))[:.)\]\-]\s+))|$)/g
+  const optPattern = /(?:^|[\s\r\n]+)(?:[•*·\-–—]\s*|[oO]\s+)?(?:\(([A-Da-d1-4]|[\u0915-\u0918])\)|\[([A-Da-d1-4]|[\u0915-\u0918])\]|(?:([A-Da-d]|[\u0915-\u0918])|([1-4])(?!\.\d))[:.)\]\-]\s+)([\s\S]*?)(?=(?:[\s\r\n]+(?:[•*·\-–—]\s*|[oO]\s+)?(?:\(([A-Da-d1-4]|[\u0915-\u0918])\)|\[([A-Da-d1-4]|[\u0915-\u0918])\]|(?:([A-Da-d]|[\u0915-\u0918])|([1-4])(?!\.\d))[:.)\]\-]\s+))|$)/g
 
 
   interface QuestionBlock {

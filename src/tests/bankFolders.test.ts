@@ -147,4 +147,28 @@ Ans: B
     expect(q.prompt).toContain('y = √3/2')
     expect(q.options?.[2].text).toBe('1/4')
   })
+
+  it('correctly structures unbraced LaTeX fractions like \\frac1{\\cot A} and options with 0', () => {
+    const rawInput = `19. यदि \\(\\cot A+\\frac1{\\cot A}=2\\), तो \\(\\tan^2 A+\\frac1{\\tan^2 A}\\) का मान है—
+
+(a) 0
+(b) 1
+(c) 2
+(d) 4`
+
+    const parsed = parseBulkQuestions(rawInput)
+    expect(parsed.length).toBe(1)
+    const q = parsed[0]
+    expect(q.type).toBe('mcq')
+    expect(q.prompt).toBe('यदि cot A + 1/cot A = 2, तो tan² A + 1/tan² A का मान है—')
+    expect(q.options?.length).toBe(4)
+    expect(q.options?.[0].label).toBe('A')
+    expect(q.options?.[0].text).toBe('0')
+    expect(q.options?.[1].label).toBe('B')
+    expect(q.options?.[1].text).toBe('1')
+    expect(q.options?.[2].label).toBe('C')
+    expect(q.options?.[2].text).toBe('2')
+    expect(q.options?.[3].label).toBe('D')
+    expect(q.options?.[3].text).toBe('4')
+  })
 })
