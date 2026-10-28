@@ -1,5 +1,6 @@
 import type { QuestionType, DifficultyLevel } from '../types'
 import { generateId } from './id'
+import { cleanMathAndStructuredText } from './mathFormatter'
 
 export interface ParsedOption {
   label: string
@@ -112,14 +113,16 @@ export function parseBulkQuestionText(
     questions.push({
       id: generateId('q'),
       tempId: generateId('tmp'),
-      prompt: currentQuestion.prompt.trim(),
+      prompt: cleanMathAndStructuredText(currentQuestion.prompt.trim()),
       type: detectedType,
       marks: currentQuestion.marks ?? defaultMarks,
       difficulty: 'medium',
       instructions: currentQuestion.instructions,
-      options: currentOptions.length > 0 ? currentOptions : undefined,
+      options: currentOptions.length > 0
+        ? currentOptions.map(o => ({ ...o, text: cleanMathAndStructuredText(o.text) }))
+        : undefined,
       answerKey: currentQuestion.answerKey,
-      explanation: currentQuestion.explanation,
+      explanation: currentQuestion.explanation ? cleanMathAndStructuredText(currentQuestion.explanation) : undefined,
       rawText: currentRawLines.join('\n'),
       warnings,
       isIncluded: true

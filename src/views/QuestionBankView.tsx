@@ -26,6 +26,7 @@ import { Button } from '../components/common/Button'
 import { Badge } from '../components/common/Badge'
 import { Modal } from '../components/common/Modal'
 import { parseBulkQuestions } from '../utils/bulkQuestionParser'
+import { cleanMathAndStructuredText } from '../utils/mathFormatter'
 import type { QuestionBankItem, BankFolder, DifficultyLevel, QuestionType, BulkParsedQuestion } from '../types'
 
 export const QuestionBankView: React.FC = () => {
@@ -219,16 +220,18 @@ export const QuestionBankView: React.FC = () => {
     if (!singlePrompt.trim()) return
 
     const questionData = {
-      prompt: singlePrompt.trim(),
+      prompt: cleanMathAndStructuredText(singlePrompt.trim()),
       subject: singleSubject,
       className: singleClass,
       topic: singleTopic.trim() || 'General',
       marks: Number(singleMarks),
       difficulty: singleDifficulty,
       type: singleType,
-      options: singleType === 'mcq' ? singleOptions : undefined,
+      options: singleType === 'mcq'
+        ? singleOptions.map(o => ({ ...o, text: cleanMathAndStructuredText(o.text) }))
+        : undefined,
       diagramUrl: singleDiagramUrl || undefined,
-      solutionText: singleSolution.trim() || undefined,
+      solutionText: singleSolution.trim() ? cleanMathAndStructuredText(singleSolution.trim()) : undefined,
       folderId: currentFolderId,
       tags: [singleSubject, singleClass, singleTopic.trim()].filter(Boolean)
     }
@@ -1005,10 +1008,21 @@ export const QuestionBankView: React.FC = () => {
           <div className="space-y-1">
             <div className="flex items-center justify-between text-xs font-bold text-slate-700">
               <span>Paste Question Text Here:</span>
-              <button
-                type="button"
-                onClick={() => {
-                  setBulkRawText(`1. किसी वृत्त पर बाह्य बिन्दु से कितनी स्पर्श रेखाएँ खींची जा सकती हैं?
+              <div className="flex items-center gap-3">
+                {bulkRawText.trim().length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setBulkRawText(cleanMathAndStructuredText(bulkRawText))}
+                    className="text-emerald-700 hover:text-emerald-800 hover:underline flex items-center gap-1 font-semibold"
+                    title="Clean LaTeX and format math into human-readable text"
+                  >
+                    <Sparkles className="w-3 h-3 text-emerald-600" /> Format Math (LaTeX)
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBulkRawText(`1. किसी वृत्त पर बाह्य बिन्दु से कितनी स्पर्श रेखाएँ खींची जा सकती हैं?
 (A) 1 (B) 2 (C) अनंत (Infinite) (D) 0
 Ans: B
 
@@ -1017,11 +1031,12 @@ Ans: B
 3. Which of the following is an irrational number?
 (A) sqrt(4) (B) sqrt(9) (C) sqrt(3) (D) 0.25
 Ans: C`)
-                }}
-                className="text-violet-600 hover:underline flex items-center gap-1"
-              >
-                <Sparkles className="w-3 h-3" /> Load Sample Exam Text
-              </button>
+                  }}
+                  className="text-violet-600 hover:underline flex items-center gap-1"
+                >
+                  <Sparkles className="w-3 h-3" /> Load Sample Exam Text
+                </button>
+              </div>
             </div>
             <textarea
               rows={7}

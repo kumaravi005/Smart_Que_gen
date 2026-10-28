@@ -1,6 +1,7 @@
 import { createWorker } from 'tesseract.js'
 import type { QuestionType, DifficultyLevel } from '../types'
 import { generateId } from './id'
+import { cleanMathAndStructuredText } from './mathFormatter'
 
 export interface ExtractedOcrQuestion {
   id: string
@@ -387,10 +388,13 @@ export function parseOcrQuestions(rawText: string): ExtractedOcrQuestion[] {
             const idx = ['\u0915', '\u0916', '\u0917', '\u0918'].indexOf(rawLabel)
             rawLabel = ['A', 'B', 'C', 'D'][idx]
           }
-          const cleanText = (m[5] || '')
+          const rawCleanOpt = (m[5] || '')
             .replace(/^[:.)\]\-\s]+/, '')
             .replace(/[\s\r\n]+/g, ' ')
             .trim()
+          const cleanText = /\\(?:frac|dfrac|tfrac|triangle|sim|cong|sqrt|alpha|beta|pm|times|div|\(|\)|\[|\])/.test(rawCleanOpt)
+            ? cleanMathAndStructuredText(rawCleanOpt)
+            : rawCleanOpt
 
           return {
             id: generateId('opt_'),
@@ -403,10 +407,13 @@ export function parseOcrQuestions(rawText: string): ExtractedOcrQuestion[] {
 
 
     // Clean up prompt: remove trailing marks tags like [2 Marks] or [1 Mark]
-    const cleanPrompt = prompt
+    const rawCleanPrompt = prompt
       .replace(/\s*\[\d+\s*(?:Marks?|M|अंक)\]\s*$/i, '')
       .replace(/\s*\(\d+\s*(?:Marks?|M|अंक)\)\s*$/i, '')
       .trim()
+    const cleanPrompt = /\\(?:frac|dfrac|tfrac|triangle|sim|cong|sqrt|alpha|beta|pm|times|div|\(|\)|\[|\])/.test(rawCleanPrompt)
+      ? cleanMathAndStructuredText(rawCleanPrompt || fullText)
+      : (rawCleanPrompt || fullText)
 
     const isMcq = options.length >= 2
     const determinedType: QuestionType = isMcq
@@ -420,7 +427,7 @@ export function parseOcrQuestions(rawText: string): ExtractedOcrQuestion[] {
     questions.push({
       id: generateId('q_ocr_'),
       detectedNumber: block.detectedNumber,
-      prompt: cleanPrompt || fullText,
+      prompt: cleanPrompt,
       type: determinedType,
       marks: block.marks || (isMcq ? 1 : 2),
       difficulty: 'medium',
@@ -433,14 +440,16 @@ export function parseOcrQuestions(rawText: string): ExtractedOcrQuestion[] {
 
   // Fallback: If no explicit numbered questions matched, treat entire text as single question
   if (questions.length === 0 && rawText.trim().length > 0) {
-    const cleanText = rawText.trim()
+    const cleanText = /\\(?:frac|dfrac|tfrac|triangle|sim|cong|sqrt|alpha|beta|pm|times|div|\(|\)|\[|\])/.test(rawText)
+      ? cleanMathAndStructuredText(rawText.trim())
+      : rawText.trim()
     questions.push({
       id: generateId('q_ocr_'),
       prompt: cleanText,
       type: 'short_answer',
       marks: 2,
       difficulty: 'medium',
-      rawText: cleanText,
+      rawText: rawText.trim(),
       uncertainNotationWarnings: detectMathAndOcrUncertainties(cleanText),
       isSelected: true
     })

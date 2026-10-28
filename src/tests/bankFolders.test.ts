@@ -102,4 +102,49 @@ Ans: B
     })
     expect(rootTreeQuestions.some(q => q.id === q1.id)).toBe(true)
   })
+
+  it('recognizes and structures mathematical LaTeX questions into human-readable text', () => {
+    const rawInput = `5. \\(\\triangle ABC \\sim \\triangle PQR\\) तथा उनके परिमाप क्रमशः 32 सेमी और 24 सेमी हैं। यदि \\(AB=10\\) सेमी, तो \\(PQ\\) का मान है—
+
+(a) 7 सेमी
+(b) \\(\\frac{40}{3}\\) सेमी
+(c) \\(\\frac{15}{2}\\) सेमी
+(d) 15 सेमी`
+
+    const parsed = parseBulkQuestions(rawInput)
+    expect(parsed.length).toBe(1)
+    const q = parsed[0]
+    expect(q.type).toBe('mcq')
+    // No raw LaTeX markers \(\) or \triangle or \sim
+    expect(q.prompt).not.toContain('\\(')
+    expect(q.prompt).not.toContain('\\)')
+    expect(q.prompt).not.toContain('\\triangle')
+    expect(q.prompt).not.toContain('\\sim')
+    // Clean geometry and equation format
+    expect(q.prompt).toContain('△ABC ~ △PQR')
+    expect(q.prompt).toContain('AB = 10')
+    expect(q.prompt).toContain('PQ')
+    expect(q.prompt).toContain('तथा उनके परिमाप क्रमशः 32 सेमी और 24 सेमी हैं')
+
+    // Clean options
+    expect(q.options?.length).toBe(4)
+    expect(q.options?.[0].text).toBe('7 सेमी')
+    expect(q.options?.[1].text).toBe('40/3 सेमी')
+    expect(q.options?.[2].text).toBe('15/2 सेमी')
+    expect(q.options?.[3].text).toBe('15 सेमी')
+  })
+
+  it('correctly cleans complex math formulas: fractions, roots, superscripts, trigonometry', () => {
+    const rawInput = `1. If \\(\\sin^2 \\theta + \\cos^2 \\theta = 1\\), find \\(\\sqrt{x^2 + y^2}\\) when \\(x = \\frac{1}{2}\\) and \\(y = \\frac{\\sqrt{3}}{2}\\).
+(A) 1 (B) 2 (C) \\frac{1}{4} (D) 0`
+
+    const parsed = parseBulkQuestions(rawInput)
+    expect(parsed.length).toBe(1)
+    const q = parsed[0]
+    expect(q.prompt).toContain('sin² θ + cos² θ = 1')
+    expect(q.prompt).toContain('√(x² + y²)')
+    expect(q.prompt).toContain('x = 1/2')
+    expect(q.prompt).toContain('y = √3/2')
+    expect(q.options?.[2].text).toBe('1/4')
+  })
 })

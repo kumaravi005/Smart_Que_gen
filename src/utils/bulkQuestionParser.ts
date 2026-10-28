@@ -1,5 +1,6 @@
 import type { QuestionType, DifficultyLevel } from '../types'
 import { generateId } from './id'
+import { cleanMathAndStructuredText } from './mathFormatter'
 
 
 export interface BulkParsedQuestion {
@@ -134,10 +135,11 @@ export function parseBulkQuestions(
             const idx = ['\u0915', '\u0916', '\u0917', '\u0918'].indexOf(rawLabel)
             rawLabel = ['A', 'B', 'C', 'D'][idx]
           }
-          const cleanText = (m[5] || '')
+          const rawCleanText = (m[5] || '')
             .replace(/^[:.)\]\-\s]+/, '')
             .replace(/[\s\r\n]+/g, ' ')
             .trim()
+          const cleanText = cleanMathAndStructuredText(rawCleanText)
 
           const isCorrect = answerKey ? rawLabel === answerKey : false
 
@@ -151,10 +153,11 @@ export function parseBulkQuestions(
       }
     }
 
-    const cleanPrompt = prompt
+    const rawCleanPrompt = prompt
       .replace(/\s*\[\d+\s*(?:Marks?|M|अंक)\]\s*$/i, '')
       .replace(/\s*\(\d+\s*(?:Marks?|M|अंक)\)\s*$/i, '')
       .trim()
+    const cleanPrompt = cleanMathAndStructuredText(rawCleanPrompt || fullText)
 
     const isMcq = options.length >= 2
     const determinedType: QuestionType = isMcq
@@ -163,13 +166,13 @@ export function parseBulkQuestions(
 
     questions.push({
       id: generateId('qb_parsed_'),
-      prompt: cleanPrompt || fullText,
+      prompt: cleanPrompt,
       type: determinedType,
       marks: block.marks || defaults.defaultMarks || (isMcq ? 1 : 2),
       difficulty: defaults.defaultDifficulty || 'medium',
       options: isMcq ? options : undefined,
       answerKey,
-      solutionText,
+      solutionText: solutionText ? cleanMathAndStructuredText(solutionText) : undefined,
       rawText: fullText,
       isSelected: true
     })
@@ -181,7 +184,7 @@ export function parseBulkQuestions(
     for (const para of paragraphs) {
       questions.push({
         id: generateId('qb_parsed_'),
-        prompt: para,
+        prompt: cleanMathAndStructuredText(para),
         type: defaults.defaultType || 'short_answer',
         marks: defaults.defaultMarks || 2,
         difficulty: defaults.defaultDifficulty || 'medium',
