@@ -11,12 +11,33 @@ import type {
 import { generateUuid } from '../utils/uuid'
 import { syncQueue } from './syncQueue'
 import { syncService } from './syncService'
+import { supabase, isSupabaseConfigured } from './supabaseClient'
 
 export const paperService = {
   // Get list of all paper drafts/metadata
   async getAllPapers(): Promise<PaperMetadata[]> {
     const db = await getDatabase()
-    const papers = await db.getAllFromIndex('papers', 'by-updated')
+    let papers = await db.getAllFromIndex('papers', 'by-updated')
+
+    // Filter out deleted papers
+    try {
+      if (db.objectStoreNames.contains('sync_tombstones')) {
+        const tombstones = await db.getAllFromIndex('sync_tombstones', 'by-entity-type', 'paper')
+        const deletedIds = new Set(tombstones.map(t => t.id))
+        const pendingDeletes = await db.getAllFromIndex('sync_queue', 'by-entity', 'paper')
+        for (const pd of pendingDeletes) {
+          if (pd.action === 'delete') {
+            deletedIds.add(pd.entityId)
+          }
+        }
+        if (deletedIds.size > 0) {
+          papers = papers.filter(p => !deletedIds.has(p.id))
+        }
+      }
+    } catch {
+      // Fallback
+    }
+
     return papers.reverse() // Most recent first
   },
 
@@ -496,6 +517,13 @@ export const paperService = {
     await tx.done
 
     await syncQueue.enqueueChange('paper', paperId, 'delete')
+    if (supabase && isSupabaseConfigured) {
+      supabase
+        .from('papers')
+        .delete()
+        .eq('id', paperId)
+        .then(() => {}, () => {})
+    }
     syncService.triggerDebouncedSync()
 
     return true

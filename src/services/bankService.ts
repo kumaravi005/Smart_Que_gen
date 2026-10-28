@@ -25,6 +25,25 @@ export const bankService = {
       rawFolders = setting?.value || []
     }
 
+    // Filter out any folders marked with tombstones or pending delete
+    try {
+      if (db.objectStoreNames.contains('sync_tombstones')) {
+        const tombstones = await db.getAllFromIndex('sync_tombstones', 'by-entity-type', 'folder')
+        const deletedIds = new Set(tombstones.map(t => t.id))
+        const pendingDeletes = await db.getAllFromIndex('sync_queue', 'by-entity', 'folder')
+        for (const pd of pendingDeletes) {
+          if (pd.action === 'delete') {
+            deletedIds.add(pd.entityId)
+          }
+        }
+        if (deletedIds.size > 0) {
+          rawFolders = rawFolders.filter(f => !deletedIds.has(f.id))
+        }
+      }
+    } catch {
+      // Fallback
+    }
+
     // Deduplicate folders by key: `${parentId || 'root'}:${name.trim().toLowerCase()}`
     const seen = new Map<string, BankFolder>()
     const duplicatesToDelete: string[] = []
@@ -92,10 +111,9 @@ export const bankService = {
       for (const delId of duplicatesToDelete) {
         syncQueue.enqueueChange('folder', delId, 'delete').catch(() => {})
         if (supabase && isSupabaseConfigured) {
-          const now = new Date().toISOString()
           supabase
             .from('bank_folders')
-            .update({ deleted_at: now })
+            .delete()
             .eq('id', delId)
             .then(() => {}, () => {})
 
@@ -232,9 +250,12 @@ export const bankService = {
         await tx.done
       }
     } catch {
-      const remaining = folders.filter(f => !folderIdsToDelete.includes(f.id))
-      await db.put('app_settings', { key: 'bank_folders_list', value: remaining })
+      // Fallback
     }
+
+    // Always update app_settings bank_folders_list to remove deleted folders
+    const remaining = folders.filter(f => !folderIdsToDelete.includes(f.id))
+    await db.put('app_settings', { key: 'bank_folders_list', value: remaining })
 
     // Handle questions in deleted folders
     const allQuestions = await db.getAll('question_bank')
@@ -257,6 +278,16 @@ export const bankService = {
     for (const fId of folderIdsToDelete) {
       await syncQueue.enqueueChange('folder', fId, 'delete')
     }
+
+    // Directly delete from Supabase cloud immediately if online
+    if (supabase && isSupabaseConfigured) {
+      supabase
+        .from('bank_folders')
+        .delete()
+        .in('id', folderIdsToDelete)
+        .then(() => {}, () => {})
+    }
+
     syncService.triggerDebouncedSync()
 
     return true
@@ -315,6 +346,25 @@ export const bankService = {
   async getQuestions(filter?: BankFilter): Promise<QuestionBankItem[]> {
     const db = await getDatabase()
     let items = await db.getAll('question_bank')
+
+    // Filter out any questions marked with tombstones or pending delete
+    try {
+      if (db.objectStoreNames.contains('sync_tombstones')) {
+        const tombstones = await db.getAllFromIndex('sync_tombstones', 'by-entity-type', 'question')
+        const deletedIds = new Set(tombstones.map(t => t.id))
+        const pendingDeletes = await db.getAllFromIndex('sync_queue', 'by-entity', 'question')
+        for (const pd of pendingDeletes) {
+          if (pd.action === 'delete') {
+            deletedIds.add(pd.entityId)
+          }
+        }
+        if (deletedIds.size > 0) {
+          items = items.filter(q => !deletedIds.has(q.id))
+        }
+      }
+    } catch {
+      // Fallback
+    }
 
     if (!filter) return items
 
@@ -469,6 +519,13 @@ export const bankService = {
     const db = await getDatabase()
     await db.delete('question_bank', id)
     await syncQueue.enqueueChange('question', id, 'delete')
+    if (supabase && isSupabaseConfigured) {
+      supabase
+        .from('question_bank')
+        .delete()
+        .eq('id', id)
+        .then(() => {}, () => {})
+    }
     syncService.triggerDebouncedSync()
     return true
   },
@@ -482,6 +539,13 @@ export const bankService = {
       await syncQueue.enqueueChange('question', id, 'delete')
     }
     await tx.done
+    if (supabase && isSupabaseConfigured) {
+      supabase
+        .from('question_bank')
+        .delete()
+        .in('id', ids)
+        .then(() => {}, () => {})
+    }
     syncService.triggerDebouncedSync()
     return true
   }

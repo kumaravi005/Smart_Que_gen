@@ -40,6 +40,13 @@ export const syncQueue = {
         deletedAt: now
       }
       await db.put('sync_tombstones', tombstone)
+      if (cloudId && cloudId !== entityId) {
+        await db.put('sync_tombstones', {
+          id: cloudId,
+          entityType,
+          deletedAt: now
+        })
+      }
     }
 
     // 3. Check for existing pending item for this entity to coalesce

@@ -3,6 +3,7 @@ import type { PaperSetupTemplate, ExamSettings, VisualLayout } from '../types'
 import { generateUuid } from '../utils/uuid'
 import { syncQueue } from './syncQueue'
 import { syncService } from './syncService'
+import { supabase, isSupabaseConfigured } from './supabaseClient'
 
 export const templateService = {
   // Get all templates (with auto-seeding on initial setup only)
@@ -17,6 +18,26 @@ export const templateService = {
     } else if (!seeded && list.length > 0) {
       await db.put('app_settings', { key: 'templates_seeded', value: true })
     }
+
+    // Filter out deleted templates
+    try {
+      if (db.objectStoreNames.contains('sync_tombstones')) {
+        const tombstones = await db.getAllFromIndex('sync_tombstones', 'by-entity-type', 'template')
+        const deletedIds = new Set(tombstones.map(t => t.id))
+        const pendingDeletes = await db.getAllFromIndex('sync_queue', 'by-entity', 'template')
+        for (const pd of pendingDeletes) {
+          if (pd.action === 'delete') {
+            deletedIds.add(pd.entityId)
+          }
+        }
+        if (deletedIds.size > 0) {
+          list = list.filter(t => !deletedIds.has(t.id))
+        }
+      }
+    } catch {
+      // Fallback
+    }
+
     return list
   },
 
@@ -57,6 +78,13 @@ export const templateService = {
     const db = await getDatabase()
     await db.delete('templates', id)
     await syncQueue.enqueueChange('template', id, 'delete')
+    if (supabase && isSupabaseConfigured) {
+      supabase
+        .from('templates')
+        .delete()
+        .eq('id', id)
+        .then(() => {}, () => {})
+    }
     syncService.triggerDebouncedSync()
     return true
   },

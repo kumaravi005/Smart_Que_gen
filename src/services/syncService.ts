@@ -454,41 +454,70 @@ class SyncService {
     const now = new Date().toISOString()
 
     switch (item.entityType) {
-      case 'paper':
-        // Soft delete paper
-        await supabase
+      case 'paper': {
+        const { error: delErr } = await supabase
           .from('papers')
-          .update({ deleted_at: now })
+          .delete()
           .eq('id', cloudId)
           .eq('institute_id', instituteId)
+        if (delErr) {
+          await supabase
+            .from('papers')
+            .update({ deleted_at: now })
+            .eq('id', cloudId)
+            .eq('institute_id', instituteId)
+        }
         break
+      }
 
-      case 'question':
-        // Soft delete question
-        await supabase
+      case 'question': {
+        const { error: delErr } = await supabase
           .from('question_bank')
-          .update({ deleted_at: now })
+          .delete()
           .eq('id', cloudId)
           .eq('institute_id', instituteId)
+        if (delErr) {
+          await supabase
+            .from('question_bank')
+            .update({ deleted_at: now })
+            .eq('id', cloudId)
+            .eq('institute_id', instituteId)
+        }
         break
+      }
 
-      case 'folder':
-        // Soft delete folder
-        await supabase
+      case 'folder': {
+        // Hard delete folder from Supabase so cascade removes subfolders and unlinks questions
+        const { error: delErr } = await supabase
           .from('bank_folders')
-          .update({ deleted_at: now })
+          .delete()
           .eq('id', cloudId)
           .eq('institute_id', instituteId)
+        if (delErr) {
+          await supabase
+            .from('bank_folders')
+            .update({ deleted_at: now })
+            .eq('id', cloudId)
+            .eq('institute_id', instituteId)
+        }
         break
+      }
 
-      case 'template':
-        // Soft delete template
-        await supabase
+      case 'template': {
+        const { error: delErr } = await supabase
           .from('templates')
-          .update({ deleted_at: now })
+          .delete()
           .eq('id', cloudId)
           .eq('institute_id', instituteId)
+        if (delErr) {
+          await supabase
+            .from('templates')
+            .update({ deleted_at: now })
+            .eq('id', cloudId)
+            .eq('institute_id', instituteId)
+        }
         break
+      }
     }
   }
 
@@ -501,6 +530,16 @@ class SyncService {
 
     // 1. Pull Bank Folders
     try {
+      // Load all folder tombstones & pending delete queue items
+      const folderTombstones = await db.getAllFromIndex('sync_tombstones', 'by-entity-type', 'folder')
+      const deletedFolderIds = new Set(folderTombstones.map(t => t.id))
+      const pendingFolderDeletes = await db.getAllFromIndex('sync_queue', 'by-entity', 'folder')
+      for (const pd of pendingFolderDeletes) {
+        if (pd.action === 'delete') {
+          deletedFolderIds.add(pd.entityId)
+        }
+      }
+
       const { data: cloudFolders, error: folderErr } = await supabase
         .from('bank_folders')
         .select('*')
@@ -510,8 +549,11 @@ class SyncService {
         // Group cloud folders to detect duplicates already present in the cloud database
         const cloudGroups = new Map<string, any[]>()
         for (const row of cloudFolders) {
-          if (row.deleted_at) {
+          if (row.deleted_at || deletedFolderIds.has(row.id)) {
             await db.delete('bank_folders', row.id)
+            if (deletedFolderIds.has(row.id)) {
+              await supabase.from('bank_folders').delete().eq('id', row.id)
+            }
             continue
           }
           const groupKey = `${row.parent_id || 'root'}:${(row.name || '').trim().toLowerCase()}`
@@ -528,13 +570,20 @@ class SyncService {
           const canonicalRow = rows[0]
           const duplicateRows = rows.slice(1)
 
-          // If there are duplicate folders in Supabase, soft-delete them and purge locally
+          // If canonical folder has a tombstone, skip it
+          if (deletedFolderIds.has(canonicalRow.id)) {
+            await db.delete('bank_folders', canonicalRow.id)
+            await supabase.from('bank_folders').delete().eq('id', canonicalRow.id)
+            continue
+          }
+
+          // If there are duplicate folders in Supabase, delete them and purge locally
           for (const dup of duplicateRows) {
             await db.delete('bank_folders', dup.id)
             try {
               await supabase
                 .from('bank_folders')
-                .update({ deleted_at: new Date().toISOString() })
+                .delete()
                 .eq('id', dup.id)
               // In Supabase, reparent any questions that were attached to the duplicate folder
               await supabase
@@ -542,7 +591,7 @@ class SyncService {
                 .update({ folder_id: canonicalRow.id })
                 .eq('folder_id', dup.id)
             } catch (err) {
-              console.warn('Could not soft-delete cloud duplicate folder:', dup.id, err)
+              console.warn('Could not delete cloud duplicate folder:', dup.id, err)
             }
           }
 
@@ -593,6 +642,15 @@ class SyncService {
 
     // 2. Pull Question Bank
     try {
+      const qTombstones = await db.getAllFromIndex('sync_tombstones', 'by-entity-type', 'question')
+      const deletedQIds = new Set(qTombstones.map(t => t.id))
+      const pendingQDeletes = await db.getAllFromIndex('sync_queue', 'by-entity', 'question')
+      for (const pd of pendingQDeletes) {
+        if (pd.action === 'delete') {
+          deletedQIds.add(pd.entityId)
+        }
+      }
+
       const { data: cloudQuestions, error: qErr } = await supabase
         .from('question_bank')
         .select('*')
@@ -600,8 +658,11 @@ class SyncService {
 
       if (!qErr && cloudQuestions) {
         for (const row of cloudQuestions) {
-          if (row.deleted_at) {
+          if (row.deleted_at || deletedQIds.has(row.id)) {
             await db.delete('question_bank', row.id)
+            if (deletedQIds.has(row.id)) {
+              await supabase.from('question_bank').delete().eq('id', row.id)
+            }
           } else {
             const isPending = await this.isEntityPendingInQueue('question', row.id)
             if (isPending) {
@@ -641,6 +702,15 @@ class SyncService {
 
     // 3. Pull Papers and their linked children (settings, contents, layouts)
     try {
+      const pTombstones = await db.getAllFromIndex('sync_tombstones', 'by-entity-type', 'paper')
+      const deletedPIds = new Set(pTombstones.map(t => t.id))
+      const pendingPDeletes = await db.getAllFromIndex('sync_queue', 'by-entity', 'paper')
+      for (const pd of pendingPDeletes) {
+        if (pd.action === 'delete') {
+          deletedPIds.add(pd.entityId)
+        }
+      }
+
       const { data: cloudPapers, error: paperErr } = await supabase
         .from('papers')
         .select('*')
@@ -648,7 +718,7 @@ class SyncService {
 
       if (!paperErr && cloudPapers) {
         for (const pRow of cloudPapers) {
-          if (pRow.deleted_at) {
+          if (pRow.deleted_at || deletedPIds.has(pRow.id)) {
             // Delete locally
             const meta = await db.get('papers', pRow.id)
             if (meta) {
@@ -656,6 +726,9 @@ class SyncService {
               await db.delete('exam_settings', meta.examSettingsId)
               await db.delete('paper_contents', meta.contentId)
               await db.delete('visual_layouts', meta.visualLayoutId)
+            }
+            if (deletedPIds.has(pRow.id)) {
+              await supabase.from('papers').delete().eq('id', pRow.id)
             }
             continue
           }
@@ -718,6 +791,15 @@ class SyncService {
 
     // 4. Pull Templates
     try {
+      const tplTombstones = await db.getAllFromIndex('sync_tombstones', 'by-entity-type', 'template')
+      const deletedTplIds = new Set(tplTombstones.map(t => t.id))
+      const pendingTplDeletes = await db.getAllFromIndex('sync_queue', 'by-entity', 'template')
+      for (const pd of pendingTplDeletes) {
+        if (pd.action === 'delete') {
+          deletedTplIds.add(pd.entityId)
+        }
+      }
+
       const { data: cloudTemplates, error: tplErr } = await supabase
         .from('templates')
         .select('*')
@@ -725,8 +807,11 @@ class SyncService {
 
       if (!tplErr && cloudTemplates) {
         for (const row of cloudTemplates) {
-          if (row.deleted_at) {
+          if (row.deleted_at || deletedTplIds.has(row.id)) {
             await db.delete('templates', row.id)
+            if (deletedTplIds.has(row.id)) {
+              await supabase.from('templates').delete().eq('id', row.id)
+            }
           } else {
             const isPending = await this.isEntityPendingInQueue('template', row.id)
             if (isPending) {
