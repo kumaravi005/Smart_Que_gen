@@ -144,12 +144,33 @@ class SyncService {
         .eq('id', user.id)
         .maybeSingle()
 
-      if (!profile || !profile.institute_id) return null
-
-      return {
-        userId: user.id,
-        instituteId: profile.institute_id
+      if (profile && profile.institute_id) {
+        return {
+          userId: user.id,
+          instituteId: profile.institute_id
+        }
       }
+
+      // Fallback 1: check user_metadata for institute_id
+      const metaInstId = (user.user_metadata as any)?.institute_id
+      if (metaInstId) {
+        return { userId: user.id, instituteId: metaInstId }
+      }
+
+      // Fallback 2: check cached profile in localStorage
+      if (typeof localStorage !== 'undefined') {
+        const cachedStr = localStorage.getItem(`omega_auth_profile_${user.id}`)
+        if (cachedStr) {
+          try {
+            const cached = JSON.parse(cachedStr)
+            if (cached.institute_id) {
+              return { userId: user.id, instituteId: cached.institute_id }
+            }
+          } catch {}
+        }
+      }
+
+      return null
     } catch {
       return null
     }
@@ -234,9 +255,9 @@ class SyncService {
       await this.pullUpdates(authInfo.instituteId, result)
 
       this.lastSyncedAt = new Date().toISOString()
-      await this.refreshPendingCount()
+      const remaining = await this.refreshPendingCount()
       this.updateState({
-        status: 'idle',
+        status: remaining > 0 && result.errors.length > 0 ? 'error' : 'idle',
         lastSyncedAt: this.lastSyncedAt,
         lastError: result.errors.length > 0 ? result.errors[0] : null
       })
@@ -292,75 +313,51 @@ class SyncService {
               }
 
               // Also ensure linked settings, content, layout are queued/synced
-              const settings = await db.get('exam_settings', paper.examSettingsId)
+              const settings = (await db.get('exam_settings', paper.examSettingsId)) || (await db.get('exam_settings', paper.id))
               if (settings) {
                 const sRow = settingsToCloud(settings, instituteId)
-                await supabase.from('exam_settings').upsert(sRow, { onConflict: 'id' })
-                if (sRow.id !== settings.id) {
-                  await db.put('exam_settings', { ...settings, id: sRow.id })
-                  await db.delete('exam_settings', settings.id)
-                }
+                await supabase.from('exam_settings').upsert(sRow, { onConflict: 'paper_id' })
               }
-              const content = await db.get('paper_contents', paper.contentId)
+              const content = (await db.get('paper_contents', paper.contentId)) || (await db.get('paper_contents', paper.id))
               if (content) {
                 const cRow = contentToCloud(content, instituteId)
-                await supabase.from('paper_contents').upsert(cRow, { onConflict: 'id' })
-                if (cRow.id !== content.id) {
-                  await db.put('paper_contents', { ...content, id: cRow.id })
-                  await db.delete('paper_contents', content.id)
-                }
+                await supabase.from('paper_contents').upsert(cRow, { onConflict: 'paper_id' })
               }
-              const layout = await db.get('visual_layouts', paper.visualLayoutId)
+              const layout = (await db.get('visual_layouts', paper.visualLayoutId)) || (await db.get('visual_layouts', paper.id))
               if (layout) {
                 const lRow = layoutToCloud(layout, instituteId)
-                await supabase.from('visual_layouts').upsert(lRow, { onConflict: 'id' })
-                if (lRow.id !== layout.id) {
-                  await db.put('visual_layouts', { ...layout, id: lRow.id })
-                  await db.delete('visual_layouts', layout.id)
-                }
+                await supabase.from('visual_layouts').upsert(lRow, { onConflict: 'paper_id' })
               }
             }
             break
           }
 
           case 'settings': {
-            const settings = await db.get('exam_settings', item.entityId)
+            const settings = (await db.get('exam_settings', item.entityId)) || (await db.get('exam_settings', item.data?.paperId))
             if (settings) {
               const row = settingsToCloud(settings, instituteId)
-              const { error } = await supabase.from('exam_settings').upsert(row, { onConflict: 'id' })
+              const { error } = await supabase.from('exam_settings').upsert(row, { onConflict: 'paper_id' })
               if (error) throw error
-              if (row.id !== item.entityId) {
-                await db.put('exam_settings', { ...settings, id: row.id })
-                await db.delete('exam_settings', item.entityId)
-              }
             }
             break
           }
 
           case 'content': {
-            const content = await db.get('paper_contents', item.entityId)
+            const content = (await db.get('paper_contents', item.entityId)) || (await db.get('paper_contents', item.data?.paperId))
             if (content) {
               const row = contentToCloud(content, instituteId)
-              const { error } = await supabase.from('paper_contents').upsert(row, { onConflict: 'id' })
+              const { error } = await supabase.from('paper_contents').upsert(row, { onConflict: 'paper_id' })
               if (error) throw error
-              if (row.id !== item.entityId) {
-                await db.put('paper_contents', { ...content, id: row.id })
-                await db.delete('paper_contents', item.entityId)
-              }
             }
             break
           }
 
           case 'layout': {
-            const layout = await db.get('visual_layouts', item.entityId)
+            const layout = (await db.get('visual_layouts', item.entityId)) || (await db.get('visual_layouts', item.data?.paperId))
             if (layout) {
               const row = layoutToCloud(layout, instituteId)
-              const { error } = await supabase.from('visual_layouts').upsert(row, { onConflict: 'id' })
+              const { error } = await supabase.from('visual_layouts').upsert(row, { onConflict: 'paper_id' })
               if (error) throw error
-              if (row.id !== item.entityId) {
-                await db.put('visual_layouts', { ...layout, id: row.id })
-                await db.delete('visual_layouts', item.entityId)
-              }
             }
             break
           }
@@ -369,7 +366,26 @@ class SyncService {
             const question = await db.get('question_bank', item.entityId)
             if (question) {
               const row = questionToCloud(question, instituteId, userId)
-              const { error } = await supabase.from('question_bank').upsert(row, { onConflict: 'id' })
+              let { error } = await supabase.from('question_bank').upsert(row, { onConflict: 'id' })
+
+              // Auto-recover foreign key violation on folder_id (e.g. folder deleted or only local)
+              if (error && (error.code === '23503' || error.message?.includes('violates foreign key') || error.message?.includes('fk_question_folder_inst'))) {
+                console.warn(`Foreign key violation on folder_id for question ${item.entityId}. Retrying with folder_id = null.`)
+                row.folder_id = null
+                const retryRes = await supabase.from('question_bank').upsert(row, { onConflict: 'id' })
+                error = retryRes.error
+                if (!error) {
+                  question.folderId = null
+                  await db.put('question_bank', question)
+                }
+              }
+
+              // Auto-recover RLS policy restriction (e.g. usage_count increment on shared question)
+              if (error && (error.code === '42501' || error.message?.includes('violates row-level security') || error.message?.includes('policy'))) {
+                console.warn(`RLS policy restricted updating question ${item.entityId} in cloud. Preserving locally.`)
+                error = null
+              }
+
               if (error) throw error
 
               if (row.id !== item.entityId) {
@@ -437,8 +453,15 @@ class SyncService {
         result.pushedCount += 1
       } catch (pushErr: any) {
         console.warn(`Failed to push queue item ${item.entityType}:${item.entityId}:`, pushErr)
+        const attempts = (item.attempts || 0) + 1
         await syncQueue.markQueueItemAttempt(item.id, pushErr?.message)
         result.errors.push(`Failed to push ${item.entityType}: ${pushErr?.message || 'Error'}`)
+
+        // If item has permanently failed after 3 attempts with schema/RLS constraint, dequeue it so the queue does not stay blocked forever
+        if (attempts >= 3 && (pushErr?.code === '42501' || pushErr?.code === '23503' || pushErr?.message?.includes('row-level security') || pushErr?.message?.includes('foreign key'))) {
+          console.warn(`Abandoning failed sync queue item ${item.id} (${item.entityType}) after ${attempts} attempts to unblock queue.`)
+          await syncQueue.removeQueueItem(item.id)
+        }
       }
     }
   }
@@ -747,41 +770,74 @@ class SyncService {
             }
           }
 
-          const localPaper = paperFromCloud(pRow)
+          const localPaper = paperFromCloud(pRow, undefined, existingPaper)
           await db.put('papers', localPaper)
           result.pulledCount += 1
 
           // Pull settings for this paper
-          const { data: sRow } = await supabase
-            .from('exam_settings')
-            .select('*')
-            .eq('paper_id', pRow.id)
-            .maybeSingle()
-          if (sRow) {
-            const localSettings = settingsFromCloud(sRow, pRow.id)
-            await db.put('exam_settings', localSettings)
+          const isSettingsPending = await this.isEntityPendingInQueue('settings', existingPaper?.examSettingsId || pRow.id)
+          if (!isSettingsPending) {
+            const { data: sRow } = await supabase
+              .from('exam_settings')
+              .select('*')
+              .eq('paper_id', pRow.id)
+              .maybeSingle()
+            if (sRow) {
+              const existingSettings = existingPaper
+                ? ((await db.get('exam_settings', existingPaper.examSettingsId)) || (await db.get('exam_settings', pRow.id)))
+                : null
+              const localSettings = settingsFromCloud(sRow, pRow.id, existingSettings)
+              await db.put('exam_settings', localSettings)
+            }
           }
 
-          // Pull contents for this paper
-          const { data: cRow } = await supabase
-            .from('paper_contents')
-            .select('*')
-            .eq('paper_id', pRow.id)
-            .maybeSingle()
-          if (cRow) {
-            const localContent = contentFromCloud(cRow, pRow.id)
-            await db.put('paper_contents', localContent)
+          // Pull contents for this paper: NEVER overwrite local questions with empty cloud placeholder!
+          const isContentPending = await this.isEntityPendingInQueue('content', existingPaper?.contentId || pRow.id)
+          if (!isContentPending) {
+            const { data: cRow } = await supabase
+              .from('paper_contents')
+              .select('*')
+              .eq('paper_id', pRow.id)
+              .maybeSingle()
+            if (cRow) {
+              const existingContent = existingPaper
+                ? ((await db.get('paper_contents', existingPaper.contentId)) || (await db.get('paper_contents', pRow.id)))
+                : null
+
+              const cloudHasQuestions = (cRow.sections || []).some((s: any) => (s.questions || []).length > 0)
+              const localHasQuestions = (existingContent?.sections || []).some(s => (s.questions || []).length > 0)
+              const localIsNewer = existingContent?.updatedAt && cRow.updated_at &&
+                new Date(existingContent.updatedAt).getTime() >= new Date(cRow.updated_at).getTime()
+
+              if (localHasQuestions && !cloudHasQuestions) {
+                // Safeguard: Never overwrite local paper questions with an empty cloud copy!
+              } else if (localIsNewer) {
+                // Local edits are newer than cloud
+              } else {
+                const localContent = contentFromCloud(cRow, pRow.id, existingContent)
+                await db.put('paper_contents', localContent)
+                if (localContent.id !== pRow.id) {
+                  await db.put('paper_contents', { ...localContent, id: pRow.id })
+                }
+              }
+            }
           }
 
           // Pull layout for this paper
-          const { data: lRow } = await supabase
-            .from('visual_layouts')
-            .select('*')
-            .eq('paper_id', pRow.id)
-            .maybeSingle()
-          if (lRow) {
-            const localLayout = layoutFromCloud(lRow, pRow.id)
-            await db.put('visual_layouts', localLayout)
+          const isLayoutPending = await this.isEntityPendingInQueue('layout', existingPaper?.visualLayoutId || pRow.id)
+          if (!isLayoutPending) {
+            const { data: lRow } = await supabase
+              .from('visual_layouts')
+              .select('*')
+              .eq('paper_id', pRow.id)
+              .maybeSingle()
+            if (lRow) {
+              const existingLayout = existingPaper
+                ? ((await db.get('visual_layouts', existingPaper.visualLayoutId)) || (await db.get('visual_layouts', pRow.id)))
+                : null
+              const localLayout = layoutFromCloud(lRow, pRow.id, existingLayout)
+              await db.put('visual_layouts', localLayout)
+            }
           }
         }
       }

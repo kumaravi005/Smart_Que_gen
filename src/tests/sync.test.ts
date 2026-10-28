@@ -462,4 +462,97 @@ describe('Offline-First Cloud Synchronization Engine', () => {
       expect(foreignPaper.institute_id).not.toBe(testInstituteId)
     })
   })
+
+  describe('Paper Content Protection & Auto-Recovery', () => {
+    it('preserves existing contentId and child IDs in paperFromCloud to avoid ID divergence', () => {
+      const existing = {
+        id: 'paper-123',
+        title: 'Class 10 Unit Test',
+        subject: 'Mathematics',
+        className: 'Class 10',
+        examName: 'Unit Test',
+        totalMarks: 10,
+        totalQuestions: 10,
+        status: 'draft' as const,
+        tags: [],
+        isArchived: false,
+        examSettingsId: 'settings-custom-uuid',
+        contentId: 'content-custom-uuid',
+        visualLayoutId: 'layout-custom-uuid',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      }
+
+      const cloudRow = {
+        id: 'paper-123',
+        institute_id: testInstituteId,
+        title: 'Class 10 Unit Test Updated in Cloud',
+        subject: 'Mathematics',
+        class_name: 'Class 10',
+        exam_name: 'Unit Test',
+        total_marks: 10,
+        total_questions: 10,
+        status: 'draft',
+        tags: [],
+        is_archived: false,
+        created_by: testTeacherAId,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        version: 2
+      }
+
+      const mapped = paperFromCloud(cloudRow, 'paper-123', existing)
+      expect(mapped.contentId).toBe('content-custom-uuid')
+      expect(mapped.examSettingsId).toBe('settings-custom-uuid')
+      expect(mapped.visualLayoutId).toBe('layout-custom-uuid')
+    })
+
+    it('getFullPaper correctly resolves and heals content when stored under paperId or contentId', async () => {
+      const paper = await paperService.createNewPaper({
+        title: 'Class 10 - Mathematics - Unit Test',
+        subject: 'Mathematics',
+        className: 'Class 10',
+        examName: 'Unit Test',
+        totalMarks: 10
+      })
+
+      const db = await getDatabase()
+      // Simulate divergence: put questions under paperId instead of contentId
+      const divergentContent = {
+        id: paper.metadata.id, // ID is paperId
+        paperId: paper.metadata.id,
+        sections: [
+          {
+            sectionId: 'sec_1',
+            title: 'Section A',
+            instructions: '',
+            questions: [
+              {
+                id: 'q1',
+                sectionId: 'sec_1',
+                orderNumber: 1,
+                prompt: 'समांतर श्रेणी 3, 7, 11, 15 का योगफल',
+                type: 'mcq' as const,
+                marks: 1,
+                difficulty: 'medium' as const,
+                options: [{ id: 'opt_1', label: 'A', text: '10', isCorrect: true }],
+                tags: []
+              }
+            ]
+          }
+        ],
+        totalCalculatedMarks: 1,
+        totalCalculatedQuestions: 1,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      }
+      await db.put('paper_contents', divergentContent)
+
+      // getFullPaper should find the content with questions and heal metadata.contentId
+      const full = await paperService.getFullPaper(paper.metadata.id)
+      expect(full).toBeDefined()
+      expect(full?.content.sections[0].questions.length).toBe(1)
+      expect(full?.metadata.contentId).toBe(paper.metadata.id)
+    })
+  })
 })

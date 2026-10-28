@@ -70,10 +70,13 @@ export const PaperSheet: React.FC<PaperSheetProps> = ({
     ? { minHeight: '210mm', width: '100%', maxWidth: '297mm' }
     : { minHeight: '297mm', width: '100%', maxWidth: '210mm' }
 
-  const isManualMode = layout.designData?.mode === 'manual' && (layout.designData.elements || []).length > 0
-  const manualElementsForPage = isManualMode
-    ? (layout.designData?.elements || []).filter(el => el.pageIndex === (page.pageNumber - 1))
+  const manualElements = layout.designData?.elements || []
+  const manualElementsForPage = layout.designData?.mode === 'manual'
+    ? manualElements.filter(el => el.pageIndex === (page.pageNumber - 1))
     : []
+  const hasManualQuestions = manualElementsForPage.some(el => el.type === 'question_block')
+  const hasQuestionsInPaper = (questions && questions.length > 0) || page.elements.some(e => e.type === 'question')
+  const isManualMode = layout.designData?.mode === 'manual' && manualElementsForPage.length > 0 && (!hasQuestionsInPaper || hasManualQuestions)
 
   return (
     <div

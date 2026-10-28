@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import {
   Eye,
@@ -31,15 +31,41 @@ import {
   generateExportFilename,
   triggerDownload
 } from '../utils/exportManager'
-import type { ColumnLayout, PageOrientation } from '../types'
+import { paperService } from '../services/paperService'
+import type { ColumnLayout, PageOrientation, FullPaper, SectionContent } from '../types'
 
 export const PreviewView: React.FC = () => {
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
   const { papers } = usePapers()
 
   const paperId = searchParams.get('paperId') || (papers.length > 0 ? papers[0].id : '')
   const { paper, loading, saveLayout, refresh } = usePaperDetails(paperId)
+
+  // Synchronize paperId to URL if missing
+  useEffect(() => {
+    if (!searchParams.get('paperId') && papers.length > 0) {
+      setSearchParams(prev => {
+        const next = new URLSearchParams(prev)
+        next.set('paperId', papers[0].id)
+        return next
+      }, { replace: true })
+    }
+  }, [papers, searchParams, setSearchParams])
+
+  // Auto-refresh if current in-memory content has 0 questions (e.g. freshly persisted from Editor)
+  useEffect(() => {
+    if (!paper || !paperId) return
+    const qCount = (paper.content?.sections || []).reduce((acc: number, s: SectionContent) => acc + (s.questions?.length || 0), 0)
+    if (qCount === 0) {
+      paperService.getFullPaper(paperId).then((refreshed: FullPaper | null) => {
+        const refreshedQCount = (refreshed?.content?.sections || []).reduce((acc: number, s: SectionContent) => acc + (s.questions?.length || 0), 0)
+        if (refreshedQCount > 0) {
+          refresh()
+        }
+      })
+    }
+  }, [paper, paperId, refresh])
 
   // View state
   const [activePageIndex, setActivePageIndex] = useState<number>(0)

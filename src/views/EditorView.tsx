@@ -464,7 +464,14 @@ export const EditorView: React.FC = () => {
             type="button"
             variant="secondary"
             size="sm"
-            onClick={() => navigate(`/preview?paperId=${paper.metadata.id}`)}
+            onClick={async () => {
+              try {
+                await persistSections(sections)
+              } catch (e) {
+                console.warn('Auto-save error before preview navigation:', e)
+              }
+              navigate(`/preview?paperId=${paper.metadata.id}`)
+            }}
             rightIcon={<ArrowRight className="w-4 h-4" />}
             className="bg-emerald-600 text-white hover:bg-emerald-700 font-bold"
           >

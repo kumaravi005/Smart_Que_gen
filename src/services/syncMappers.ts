@@ -45,11 +45,15 @@ export function paperToCloud(
 /**
  * Maps Supabase papers row back to local PaperMetadata model.
  */
-export function paperFromCloud(cloud: Record<string, any>, localId?: string): PaperMetadata {
+export function paperFromCloud(
+  cloud: Record<string, any>,
+  localId?: string,
+  existingMeta?: PaperMetadata | null
+): PaperMetadata {
   const id = localId || cloud.id
-  const settingsId = cloud.exam_settings_id || (isValidUuid(id) ? id : deterministicUuid('setting', id))
-  const contentId = cloud.content_id || (isValidUuid(id) ? id : deterministicUuid('content', id))
-  const visualLayoutId = cloud.visual_layout_id || (isValidUuid(id) ? id : deterministicUuid('layout', id))
+  const settingsId = existingMeta?.examSettingsId || cloud.exam_settings_id || (isValidUuid(id) ? id : deterministicUuid('setting', id))
+  const contentId = existingMeta?.contentId || cloud.content_id || (isValidUuid(id) ? id : deterministicUuid('content', id))
+  const visualLayoutId = existingMeta?.visualLayoutId || cloud.visual_layout_id || (isValidUuid(id) ? id : deterministicUuid('layout', id))
 
   return {
     id,
@@ -108,9 +112,13 @@ export function settingsToCloud(
 /**
  * Maps Supabase exam_settings row to local ExamSettings model.
  */
-export function settingsFromCloud(cloud: Record<string, any>, localPaperId?: string): ExamSettings {
+export function settingsFromCloud(
+  cloud: Record<string, any>,
+  localPaperId?: string,
+  existingSettings?: ExamSettings | null
+): ExamSettings {
   const paperId = localPaperId || cloud.paper_id
-  const id = isValidUuid(paperId) ? paperId : deterministicUuid('setting', paperId)
+  const id = existingSettings?.id || cloud.id || (isValidUuid(paperId) ? paperId : deterministicUuid('setting', paperId))
 
   return {
     id,
@@ -175,9 +183,13 @@ export function contentToCloud(
 /**
  * Maps Supabase paper_contents row to local PaperContent model.
  */
-export function contentFromCloud(cloud: Record<string, any>, localPaperId?: string): PaperContent {
+export function contentFromCloud(
+  cloud: Record<string, any>,
+  localPaperId?: string,
+  existingContent?: PaperContent | null
+): PaperContent {
   const paperId = localPaperId || cloud.paper_id
-  const id = isValidUuid(paperId) ? paperId : deterministicUuid('content', paperId)
+  const id = existingContent?.id || cloud.id || (isValidUuid(paperId) ? paperId : deterministicUuid('content', paperId))
 
   return {
     id,
@@ -242,9 +254,13 @@ export function layoutToCloud(
 /**
  * Maps Supabase visual_layouts row to local VisualLayout model.
  */
-export function layoutFromCloud(cloud: Record<string, any>, localPaperId?: string): VisualLayout {
+export function layoutFromCloud(
+  cloud: Record<string, any>,
+  localPaperId?: string,
+  existingLayout?: VisualLayout | null
+): VisualLayout {
   const paperId = localPaperId || cloud.paper_id
-  const id = isValidUuid(paperId) ? paperId : deterministicUuid('layout', paperId)
+  const id = existingLayout?.id || cloud.id || (isValidUuid(paperId) ? paperId : deterministicUuid('layout', paperId))
 
   return {
     id,

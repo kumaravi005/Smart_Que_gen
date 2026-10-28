@@ -53,9 +53,42 @@ export const paperService = {
     const metadata = await db.get('papers', paperId)
     if (!metadata) return null
 
-    const rawSettings = await db.get('exam_settings', metadata.examSettingsId)
-    const content = await db.get('paper_contents', metadata.contentId)
-    const rawLayout = await db.get('visual_layouts', metadata.visualLayoutId)
+    let rawSettings = await db.get('exam_settings', metadata.examSettingsId)
+    if (!rawSettings) {
+      try {
+        rawSettings = (await db.getFromIndex('exam_settings', 'by-paper', paperId)) || (await db.get('exam_settings', paperId))
+      } catch {}
+    }
+
+    let content = await db.get('paper_contents', metadata.contentId)
+    // Fallback: check by paper index or by paperId directly
+    let altContentByPaper: PaperContent | undefined
+    let altContentById: PaperContent | undefined
+    try {
+      altContentByPaper = await db.getFromIndex('paper_contents', 'by-paper', paperId)
+    } catch {}
+    try {
+      altContentById = await db.get('paper_contents', paperId)
+    } catch {}
+
+    // Pick the content record that actually contains questions if there is a discrepancy
+    const candidateContents = [content, altContentByPaper, altContentById].filter(Boolean) as PaperContent[]
+    const bestContent = candidateContents.find(c => (c.sections || []).some(s => (s.questions || []).length > 0)) || candidateContents[0]
+
+    if (bestContent) {
+      content = bestContent
+      if (metadata.contentId !== content.id) {
+        metadata.contentId = content.id
+        await db.put('papers', metadata)
+      }
+    }
+
+    let rawLayout = await db.get('visual_layouts', metadata.visualLayoutId)
+    if (!rawLayout) {
+      try {
+        rawLayout = (await db.getFromIndex('visual_layouts', 'by-paper', paperId)) || (await db.get('visual_layouts', paperId))
+      } catch {}
+    }
 
     if (!rawSettings || !content || !rawLayout) {
       console.warn(`Paper ${paperId} has missing linked records:`, { rawSettings, content, rawLayout })
@@ -372,9 +405,13 @@ export const paperService = {
     content.totalCalculatedQuestions = totalQuestions
 
     await db.put('paper_contents', content)
+    if (content.id !== content.paperId) {
+      await db.put('paper_contents', { ...content, id: content.paperId })
+    }
 
     const meta = await db.get('papers', content.paperId)
     if (meta) {
+      meta.contentId = content.id
       meta.totalQuestions = totalQuestions
       meta.updatedAt = content.updatedAt
       await db.put('papers', meta)
