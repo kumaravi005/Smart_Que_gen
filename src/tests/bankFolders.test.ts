@@ -171,4 +171,28 @@ Ans: B
     expect(q.options?.[3].label).toBe('D')
     expect(q.options?.[3].text).toBe('4')
   })
+
+  it('correctly structures trigonometric degree fractions like \\frac{\\sin29^\\circ}{\\cos61^\\circ}', () => {
+    const rawInput = `12. \\(\\frac{\\sin29^\\circ}{\\cos61^\\circ}\\) का मान है—
+
+(a) 90
+(b) 0
+(c) 1
+(d) 32`
+
+    const parsed = parseBulkQuestions(rawInput)
+    expect(parsed.length).toBe(1)
+    const q = parsed[0]
+    expect(q.type).toBe('mcq')
+    expect(q.prompt).toBe('sin 29°/cos 61° का मान है—')
+    expect(q.options?.length).toBe(4)
+    expect(q.options?.[0].label).toBe('A')
+    expect(q.options?.[0].text).toBe('90')
+    expect(q.options?.[1].label).toBe('B')
+    expect(q.options?.[1].text).toBe('0')
+    expect(q.options?.[2].label).toBe('C')
+    expect(q.options?.[2].text).toBe('1')
+    expect(q.options?.[3].label).toBe('D')
+    expect(q.options?.[3].text).toBe('32')
+  })
 })

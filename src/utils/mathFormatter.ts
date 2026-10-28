@@ -89,7 +89,7 @@ function extractBalancedBraces(str: string, startIndex: number): { content: stri
 }
 
 /**
- * Resolves LaTeX fractions (including nested and with roots) into readable 'a/b' or '(a)/b'.
+ * Resolves LaTeX fractions (including nested, unbraced, and with roots/functions) into readable 'a/b'.
  */
 function resolveFractions(text: string): string {
   // Normalize single-token unbraced arguments: e.g. \frac1{\cot A} -> \frac{1}{\cot A}, \frac12 -> \frac{1}{2}
@@ -199,27 +199,34 @@ export function cleanMathAndStructuredText(input: string): string {
   text = text.replace(/\\right\./g, '')
 
   // 4. Geometry and Similarity Symbols (e.g. \triangle ABC \sim \triangle PQR -> △ABC ~ △PQR)
-  text = text.replace(/\\(?:triangle|bigtriangleup)\b\s*/g, '△')
-  text = text.replace(/\\sim\b/g, '~')
-  text = text.replace(/\\cong\b/g, '≅')
-  text = text.replace(/\\perp\b/g, '⊥')
-  text = text.replace(/\\parallel\b/g, '∥')
-  text = text.replace(/\\angle\b\s*/g, '∠')
-  text = text.replace(/\\measuredangle\b\s*/g, '∡')
-  text = text.replace(/\\square\b\s*/g, '□')
-  text = text.replace(/\\odot\b\s*/g, '⊙')
+  text = text.replace(/\\(?:triangle|bigtriangleup)(?![a-zA-Z])\s*/g, '△')
+  text = text.replace(/\\sim(?![a-zA-Z])/g, '~')
+  text = text.replace(/\\cong(?![a-zA-Z])/g, '≅')
+  text = text.replace(/\\perp(?![a-zA-Z])/g, '⊥')
+  text = text.replace(/\\parallel(?![a-zA-Z])/g, '∥')
+  text = text.replace(/\\angle(?![a-zA-Z])\s*/g, '∠')
+  text = text.replace(/\\measuredangle(?![a-zA-Z])\s*/g, '∡')
+  text = text.replace(/\\square(?![a-zA-Z])\s*/g, '□')
+  text = text.replace(/\\odot(?![a-zA-Z])\s*/g, '⊙')
 
   // Degrees: ^\circ, ^{\circ}, \degree
   text = text.replace(/\^\s*\{\s*\\circ\s*\}/g, '°')
-  text = text.replace(/\^\s*\\circ\b/g, '°')
-  text = text.replace(/\\degree\b/g, '°')
-  text = text.replace(/\\circ\b/g, '°')
+  text = text.replace(/\^\s*\\circ(?![a-zA-Z])/g, '°')
+  text = text.replace(/\\degree(?![a-zA-Z])/g, '°')
+  text = text.replace(/\\circ(?![a-zA-Z])/g, '°')
 
-  // 5. Fractions & Roots (balanced braces)
+  // 5. Trigonometric and standard function prefixes
+  // Matches \sin29 -> sin 29, \cos61 -> cos 61, \tan45 -> tan 45
+  text = text.replace(/\\(sin|cos|tan|cot|sec|csc|cosec|log|ln|lim|exp|max|min)(?![a-zA-Z])\s*([0-9]+)/gi, '$1 $2')
+  text = text.replace(/\\(sin|cos|tan|cot|sec|csc|cosec|log|ln|lim|exp|max|min)(?![a-zA-Z])/gi, '$1')
+  // Clean if already without backslash but squished to digits: e.g. "sin29°" -> "sin 29°", "cos61°" -> "cos 61°"
+  text = text.replace(/\b(sin|cos|tan|cot|sec|csc|cosec|log|ln|lim|exp|max|min)\s*([0-9]+)/gi, '$1 $2')
+
+  // 6. Fractions & Roots (balanced braces)
   text = resolveFractions(text)
   text = resolveRoots(text)
 
-  // 6. Superscripts and Subscripts
+  // 7. Superscripts and Subscripts
   // Curly brace superscripts: e.g. x^{2} -> x²
   text = text.replace(/\^\s*\{([^{}]+)\}/g, (_m, content) => {
     const trimmed = content.trim()
@@ -240,92 +247,89 @@ export function cleanMathAndStructuredText(input: string): string {
   // Single char subscripts: e.g. x_1 -> x₁, x_2 -> x₂
   text = text.replace(/_([0-9+\-=()aeoxnijk])/g, (_m, ch) => SUBSCRIPT_MAP[ch] || `_${ch}`)
 
-  // 7. Arithmetic & Comparison Operators
-  text = text.replace(/\\times\b/g, '×')
-  text = text.replace(/\\div\b/g, '÷')
-  text = text.replace(/\\pm\b/g, '±')
-  text = text.replace(/\\mp\b/g, '∓')
-  text = text.replace(/\\cdot\b/g, '·')
-  text = text.replace(/\\bullet\b/g, '•')
-  text = text.replace(/\\ast\b/g, '*')
-  text = text.replace(/\\star\b/g, '*')
-  text = text.replace(/\\le\b|\\leq\b/g, '≤')
-  text = text.replace(/\\ge\b|\\geq\b/g, '≥')
-  text = text.replace(/\\neq\b|\\ne\b/g, '≠')
-  text = text.replace(/\\approx\b/g, '≈')
-  text = text.replace(/\\equiv\b/g, '≡')
-  text = text.replace(/\\propto\b/g, '∝')
-  text = text.replace(/\\infty\b/g, '∞')
+  // 8. Arithmetic & Comparison Operators
+  text = text.replace(/\\times(?![a-zA-Z])/g, '×')
+  text = text.replace(/\\div(?![a-zA-Z])/g, '÷')
+  text = text.replace(/\\pm(?![a-zA-Z])/g, '±')
+  text = text.replace(/\\mp(?![a-zA-Z])/g, '∓')
+  text = text.replace(/\\cdot(?![a-zA-Z])/g, '·')
+  text = text.replace(/\\bullet(?![a-zA-Z])/g, '•')
+  text = text.replace(/\\ast(?![a-zA-Z])/g, '*')
+  text = text.replace(/\\star(?![a-zA-Z])/g, '*')
+  text = text.replace(/\\le(?![a-zA-Z])|\\leq(?![a-zA-Z])/g, '≤')
+  text = text.replace(/\\ge(?![a-zA-Z])|\\geq(?![a-zA-Z])/g, '≥')
+  text = text.replace(/\\neq(?![a-zA-Z])|\\ne(?![a-zA-Z])/g, '≠')
+  text = text.replace(/\\approx(?![a-zA-Z])/g, '≈')
+  text = text.replace(/\\equiv(?![a-zA-Z])/g, '≡')
+  text = text.replace(/\\propto(?![a-zA-Z])/g, '∝')
+  text = text.replace(/\\infty(?![a-zA-Z])/g, '∞')
 
   // Arrows
-  text = text.replace(/\\rightarrow\b|\\to\b/g, '→')
-  text = text.replace(/\\leftarrow\b/g, '←')
-  text = text.replace(/\\Rightarrow\b/g, '⇒')
-  text = text.replace(/\\Leftarrow\b/g, '⇐')
-  text = text.replace(/\\Leftrightarrow\b/g, '⇔')
+  text = text.replace(/\\rightarrow(?![a-zA-Z])|\\to(?![a-zA-Z])/g, '→')
+  text = text.replace(/\\leftarrow(?![a-zA-Z])/g, '←')
+  text = text.replace(/\\Rightarrow(?![a-zA-Z])/g, '⇒')
+  text = text.replace(/\\Leftarrow(?![a-zA-Z])/g, '⇐')
+  text = text.replace(/\\Leftrightarrow(?![a-zA-Z])/g, '⇔')
 
   // Calculus & Set Theory
-  text = text.replace(/\\sum\b/g, '∑')
-  text = text.replace(/\\prod\b/g, '∏')
-  text = text.replace(/\\int\b/g, '∫')
-  text = text.replace(/\\partial\b/g, '∂')
-  text = text.replace(/\\nabla\b/g, '∇')
-  text = text.replace(/\\subset\b/g, '⊂')
-  text = text.replace(/\\supset\b/g, '⊃')
-  text = text.replace(/\\subseteq\b/g, '⊆')
-  text = text.replace(/\\supseteq\b/g, '⊇')
-  text = text.replace(/\\in\b/g, '∈')
-  text = text.replace(/\\notin\b/g, '∉')
-  text = text.replace(/\\cup\b/g, '∪')
-  text = text.replace(/\\cap\b/g, '∩')
-  text = text.replace(/\\emptyset\b/g, '∅')
+  text = text.replace(/\\sum(?![a-zA-Z])/g, '∑')
+  text = text.replace(/\\prod(?![a-zA-Z])/g, '∏')
+  text = text.replace(/\\int(?![a-zA-Z])/g, '∫')
+  text = text.replace(/\\partial(?![a-zA-Z])/g, '∂')
+  text = text.replace(/\\nabla(?![a-zA-Z])/g, '∇')
+  text = text.replace(/\\subset(?![a-zA-Z])/g, '⊂')
+  text = text.replace(/\\supset(?![a-zA-Z])/g, '⊃')
+  text = text.replace(/\\subseteq(?![a-zA-Z])/g, '⊆')
+  text = text.replace(/\\supseteq(?![a-zA-Z])/g, '⊇')
+  text = text.replace(/\\in(?![a-zA-Z])/g, '∈')
+  text = text.replace(/\\notin(?![a-zA-Z])/g, '∉')
+  text = text.replace(/\\cup(?![a-zA-Z])/g, '∪')
+  text = text.replace(/\\cap(?![a-zA-Z])/g, '∩')
+  text = text.replace(/\\emptyset(?![a-zA-Z])/g, '∅')
 
-  // 8. Greek Letters (common in CBSE/State board physics & maths)
-  text = text.replace(/\\alpha\b/g, 'α')
-  text = text.replace(/\\beta\b/g, 'β')
-  text = text.replace(/\\gamma\b/g, 'γ')
-  text = text.replace(/\\delta\b/g, 'δ')
-  text = text.replace(/\\epsilon\b|\\varepsilon\b/g, 'ε')
-  text = text.replace(/\\zeta\b/g, 'ζ')
-  text = text.replace(/\\eta\b/g, 'η')
-  text = text.replace(/\\theta\b|\\vartheta\b/g, 'θ')
-  text = text.replace(/\\iota\b/g, 'ι')
-  text = text.replace(/\\kappa\b/g, 'κ')
-  text = text.replace(/\\lambda\b/g, 'λ')
-  text = text.replace(/\\mu\b/g, 'μ')
-  text = text.replace(/\\nu\b/g, 'ν')
-  text = text.replace(/\\xi\b/g, 'ξ')
-  text = text.replace(/\\pi\b|\\varpi\b/g, 'π')
-  text = text.replace(/\\rho\b|\\varrho\b/g, 'ρ')
-  text = text.replace(/\\sigma\b|\\varsigma\b/g, 'σ')
-  text = text.replace(/\\tau\b/g, 'τ')
-  text = text.replace(/\\upsilon\b/g, 'υ')
-  text = text.replace(/\\phi\b|\\varphi\b/g, 'φ')
-  text = text.replace(/\\chi\b/g, 'χ')
-  text = text.replace(/\\psi\b/g, 'ψ')
-  text = text.replace(/\\omega\b/g, 'ω')
+  // 9. Greek Letters (common in CBSE/State board physics & maths)
+  text = text.replace(/\\alpha(?![a-zA-Z])/g, 'α')
+  text = text.replace(/\\beta(?![a-zA-Z])/g, 'β')
+  text = text.replace(/\\gamma(?![a-zA-Z])/g, 'γ')
+  text = text.replace(/\\delta(?![a-zA-Z])/g, 'δ')
+  text = text.replace(/\\epsilon(?![a-zA-Z])|\\varepsilon(?![a-zA-Z])/g, 'ε')
+  text = text.replace(/\\zeta(?![a-zA-Z])/g, 'ζ')
+  text = text.replace(/\\eta(?![a-zA-Z])/g, 'η')
+  text = text.replace(/\\theta(?![a-zA-Z])|\\vartheta(?![a-zA-Z])/g, 'θ')
+  text = text.replace(/\\iota(?![a-zA-Z])/g, 'ι')
+  text = text.replace(/\\kappa(?![a-zA-Z])/g, 'κ')
+  text = text.replace(/\\lambda(?![a-zA-Z])/g, 'λ')
+  text = text.replace(/\\mu(?![a-zA-Z])/g, 'μ')
+  text = text.replace(/\\nu(?![a-zA-Z])/g, 'ν')
+  text = text.replace(/\\xi(?![a-zA-Z])/g, 'ξ')
+  text = text.replace(/\\pi(?![a-zA-Z])|\\varpi(?![a-zA-Z])/g, 'π')
+  text = text.replace(/\\rho(?![a-zA-Z])|\\varrho(?![a-zA-Z])/g, 'ρ')
+  text = text.replace(/\\sigma(?![a-zA-Z])|\\varsigma(?![a-zA-Z])/g, 'σ')
+  text = text.replace(/\\tau(?![a-zA-Z])/g, 'τ')
+  text = text.replace(/\\upsilon(?![a-zA-Z])/g, 'υ')
+  text = text.replace(/\\phi(?![a-zA-Z])|\\varphi(?![a-zA-Z])/g, 'φ')
+  text = text.replace(/\\chi(?![a-zA-Z])/g, 'χ')
+  text = text.replace(/\\psi(?![a-zA-Z])/g, 'ψ')
+  text = text.replace(/\\omega(?![a-zA-Z])/g, 'ω')
 
   // Capital Greek
-  text = text.replace(/\\Gamma\b/g, 'Γ')
-  text = text.replace(/\\Delta\b/g, 'Δ')
-  text = text.replace(/\\Theta\b/g, 'Θ')
-  text = text.replace(/\\Lambda\b/g, 'Λ')
-  text = text.replace(/\\Xi\b/g, 'Ξ')
-  text = text.replace(/\\Pi\b/g, 'Π')
-  text = text.replace(/\\Sigma\b/g, 'Σ')
-  text = text.replace(/\\Upsilon\b/g, 'Υ')
-  text = text.replace(/\\Phi\b/g, 'Φ')
-  text = text.replace(/\\Psi\b/g, 'Ψ')
-  text = text.replace(/\\Omega\b/g, 'Ω')
-
-  // 9. Trigonometric and standard function prefixes
-  text = text.replace(/\\(sin|cos|tan|cot|sec|csc|cosec|log|ln|lim|max|min)\b/g, '$1')
+  text = text.replace(/\\Gamma(?![a-zA-Z])/g, 'Γ')
+  text = text.replace(/\\Delta(?![a-zA-Z])/g, 'Δ')
+  text = text.replace(/\\Theta(?![a-zA-Z])/g, 'Θ')
+  text = text.replace(/\\Lambda(?![a-zA-Z])/g, 'Λ')
+  text = text.replace(/\\Xi(?![a-zA-Z])/g, 'Ξ')
+  text = text.replace(/\\Pi(?![a-zA-Z])/g, 'Π')
+  text = text.replace(/\\Sigma(?![a-zA-Z])/g, 'Σ')
+  text = text.replace(/\\Upsilon(?![a-zA-Z])/g, 'Υ')
+  text = text.replace(/\\Phi(?![a-zA-Z])/g, 'Φ')
+  text = text.replace(/\\Psi(?![a-zA-Z])/g, 'Ψ')
+  text = text.replace(/\\Omega(?![a-zA-Z])/g, 'Ω')
 
   // 10. Clean escaped formatting symbols like \% -> %, \& -> &, \_ -> _
   text = text.replace(/\\([%&$#_{}])/g, '$1')
 
   // Clean LaTeX spacing commands: \,, \;, \!, \quad, \qquad, \enspace
-  text = text.replace(/\\[,;!]|\\quad\b|\\qquad\b|\\enspace\b/g, ' ')
+  text = text.replace(/\\[,;!]|\\quad(?![a-zA-Z])|\\qquad(?![a-zA-Z])|\\enspace(?![a-zA-Z])/g, ' ')
 
   // 11. Smart mathematical spacing normalization
   // Space around addition + when missing: e.g. "cot A+1/cot A" -> "cot A + 1/cot A", "tan² A+1" -> "tan² A + 1"
@@ -345,11 +349,11 @@ export function cleanMathAndStructuredText(input: string): string {
   text = text.replace(/([△][a-zA-Z0-9]+)\s*~\s*([△][a-zA-Z0-9]+)/g, '$1 ~ $2')
 
   // Space before Devanagari words after math symbols / numbers if squished
-  // e.g. "10सेमी" -> "10 सेमी", "40/3सेमी" -> "40/3 सेमी"
-  text = text.replace(/([0-9⁰¹²³⁴⁵⁶⁷⁸⁹])([\u0900-\u097F])/g, '$1 $2')
+  // e.g. "10सेमी" -> "10 सेमी", "40/3सेमी" -> "40/3 सेमी", "61°का" -> "61° का"
+  text = text.replace(/([0-9⁰¹²³⁴⁵⁶⁷⁸⁹°])([\u0900-\u097F])/g, '$1 $2')
 
   // Remove any remaining stray backslashes before plain alphanumeric words
-  text = text.replace(/\\([a-zA-Z]+)\b/g, '$1')
+  text = text.replace(/\\([a-zA-Z]+)(?![a-zA-Z])/g, '$1')
 
   // Collapse multiple spaces into single space, preserving newlines
   text = text
