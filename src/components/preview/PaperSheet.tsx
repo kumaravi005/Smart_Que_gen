@@ -2,6 +2,7 @@ import React from 'react'
 import type { GeneratedPage } from '../../types/pageLayout'
 import type { ExamSettings, VisualLayout, Question } from '../../types'
 import { estimateMcqOptionGrid } from '../../utils/mcqLayout'
+import { FormattedMathText } from '../common/FormattedMathText'
 
 /**
  * Strips duplicate leading question numbers (e.g. "1.", "1)", "1:", "Q1.", "Q.1", "प्रश्न 1.")
@@ -183,9 +184,9 @@ export const PaperSheet: React.FC<PaperSheetProps> = ({
                         <span className="font-bold text-slate-900 shrink-0">
                           {el.displayNumber || ''}
                         </span>
-                        <p className="flex-1 text-slate-800 text-xs sm:text-sm font-medium leading-relaxed">
-                          {linkedQuestion?.prompt || el.text}
-                        </p>
+                        <div className="flex-1 text-slate-800 text-xs sm:text-sm font-medium leading-relaxed">
+                          <FormattedMathText text={cleanQuestionPrompt(linkedQuestion?.prompt || el.text || '')} />
+                        </div>
                         {linkedQuestion?.marks && (
                           <span className="text-xs font-bold font-sans text-slate-700 shrink-0">
                             [{linkedQuestion.marks}]
@@ -195,10 +196,11 @@ export const PaperSheet: React.FC<PaperSheetProps> = ({
 
                       {/* MCQ Options preview if applicable */}
                       {linkedQuestion?.options && (
-                        <div className="grid grid-cols-2 gap-1 text-[11px] font-sans pt-1">
+                        <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-[11px] font-sans pt-1">
                           {linkedQuestion.options.map((opt) => (
-                            <div key={opt.id} className="truncate">
-                              <span className="font-bold">({opt.label})</span> {opt.text}
+                            <div key={opt.id} className="flex items-center gap-1 min-h-[28px]">
+                              <span className="font-bold shrink-0">({opt.label})</span>
+                              <FormattedMathText text={opt.text} isOption={true} />
                             </div>
                           ))}
                         </div>
@@ -477,9 +479,9 @@ export const PaperSheet: React.FC<PaperSheetProps> = ({
                             )}
 
                             {/* Prompt */}
-                            <p className="leading-relaxed break-words font-medium text-slate-900">
-                              {cleanQuestionPrompt(q.prompt)}
-                            </p>
+                            <div className="leading-relaxed break-words font-medium text-slate-900">
+                              <FormattedMathText text={cleanQuestionPrompt(q.prompt)} />
+                            </div>
 
                             {/* Optional Diagram / Image */}
                             {q.diagramUrl && (
@@ -496,9 +498,9 @@ export const PaperSheet: React.FC<PaperSheetProps> = ({
                             {q.options && q.options.length > 0 && (
                               <div className={`pt-1 font-sans text-xs grid ${mcqGrid.gridClass} gap-x-3 gap-y-1`}>
                                 {q.options.map((opt: any) => (
-                                  <div key={opt.id} className="flex items-baseline gap-1 break-words">
+                                  <div key={opt.id} className="flex items-center gap-1.5 break-words min-h-[30px]">
                                     <span className="font-bold shrink-0">({opt.label})</span>
-                                    <span className="break-words">{opt.text}</span>
+                                    <FormattedMathText text={opt.text} isOption={true} />
                                   </div>
                                 ))}
                               </div>

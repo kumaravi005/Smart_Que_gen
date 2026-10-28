@@ -195,4 +195,28 @@ Ans: B
     expect(q.options?.[3].label).toBe('D')
     expect(q.options?.[3].text).toBe('32')
   })
+
+  it('correctly structures question 66 with factored fraction options and bracketed powers', () => {
+    const rawInput = `66. प्रथम \\(n\\) प्राकृतिक संख्याओं का योगफल है—
+
+(a) \\(\\frac{n(n+1)(2n+1)}6\\)
+(b) \\(\\frac{n(n+1)}2\\)
+(c) \\(\\left[\\frac{n(n+1)}2\\right]^2\\)
+(d) \\(\\frac{n(n-1)}2\\)`
+
+    const parsed = parseBulkQuestions(rawInput)
+    expect(parsed.length).toBe(1)
+    const q = parsed[0]
+    expect(q.type).toBe('mcq')
+    expect(q.prompt).toBe('प्रथम n प्राकृतिक संख्याओं का योगफल है—')
+    expect(q.options?.length).toBe(4)
+    expect(q.options?.[0].label).toBe('A')
+    expect(q.options?.[0].text).toBe('n(n + 1)(2n + 1)/6')
+    expect(q.options?.[1].label).toBe('B')
+    expect(q.options?.[1].text).toBe('n(n + 1)/2')
+    expect(q.options?.[2].label).toBe('C')
+    expect(q.options?.[2].text).toBe('[n(n + 1)/2]²')
+    expect(q.options?.[3].label).toBe('D')
+    expect(q.options?.[3].text).toBe('n(n - 1)/2')
+  })
 })

@@ -10,6 +10,7 @@ import {
 import { Modal } from '../common/Modal'
 import { Button } from '../common/Button'
 import { Badge } from '../common/Badge'
+import { FormattedMathText } from '../common/FormattedMathText'
 import type { Question, SectionContent, QuestionType } from '../../types'
 import { parseBulkQuestionText, type ParsedQuestion } from '../../utils/bulkParser'
 import { generateId } from '../../utils/id'
@@ -416,7 +417,9 @@ Solution: Food is mixed with gastric juices containing hydrochloric acid and pep
                               }`}
                             >
                               <span className="font-mono font-bold shrink-0">({opt.label})</span>
-                              <span className="truncate flex-1">{opt.text}</span>
+                              <div className="flex-1 min-w-0">
+                                <FormattedMathText text={opt.text} isOption={true} />
+                              </div>
                               {opt.isCorrect && (
                                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                               )}

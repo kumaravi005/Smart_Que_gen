@@ -2,6 +2,7 @@ import React, { useRef, useState, useEffect } from 'react'
 import type { DesignerElement, FullPaper } from '../../types'
 import { checkBoundaryWarnings } from '../../utils/designerConversion'
 import { AlertTriangle, Lock } from 'lucide-react'
+import { FormattedMathText } from '../common/FormattedMathText'
 
 interface DesignerCanvasProps {
   elements: DesignerElement[]
@@ -285,9 +286,9 @@ export const DesignerCanvas: React.FC<DesignerCanvasProps> = ({
                       <span className="font-bold text-slate-900 shrink-0">
                         {el.displayNumber || ''}
                       </span>
-                      <p className="flex-1 text-slate-800 text-xs sm:text-sm font-medium leading-relaxed">
-                        {linkedQuestion?.prompt || el.text}
-                      </p>
+                      <div className="flex-1 text-slate-800 text-xs sm:text-sm font-medium leading-relaxed">
+                        <FormattedMathText text={linkedQuestion?.prompt || el.text || ''} />
+                      </div>
                       {linkedQuestion?.marks && (
                         <span className="text-xs font-bold font-sans text-slate-700 shrink-0">
                           [{linkedQuestion.marks}]
@@ -299,8 +300,9 @@ export const DesignerCanvas: React.FC<DesignerCanvasProps> = ({
                     {linkedQuestion?.options && (
                       <div className="grid grid-cols-2 gap-1 text-[11px] font-sans pt-1">
                         {linkedQuestion.options.map(opt => (
-                          <div key={opt.id} className="truncate">
-                            <span className="font-bold">({opt.label})</span> {opt.text}
+                          <div key={opt.id} className="flex items-center gap-1 min-h-[26px]">
+                            <span className="font-bold shrink-0">({opt.label})</span>
+                            <FormattedMathText text={opt.text} isOption={true} />
                           </div>
                         ))}
                       </div>

@@ -89,6 +89,46 @@ function extractBalancedBraces(str: string, startIndex: number): { content: stri
 }
 
 /**
+ * Checks if a string has + or - at the top level (outside parentheses, brackets, or braces).
+ */
+function hasTopLevelAdditionOrSubtraction(str: string): boolean {
+  let depth = 0
+  for (let i = 0; i < str.length; i++) {
+    const ch = str[i]
+    if (ch === '(' || ch === '[' || ch === '{') depth++
+    else if (ch === ')' || ch === ']' || ch === '}') depth--
+    else if (depth === 0 && (ch === '+' || ch === '-' || ch === '=')) {
+      return true
+    }
+  }
+  return false
+}
+
+/**
+ * Strips outer enclosing parentheses if they enclose the entire expression and are redundant.
+ */
+function unwrapRedundantParens(str: string): string {
+  let s = str.trim()
+  while (s.startsWith('(') && s.endsWith(')')) {
+    let depth = 0
+    let closesAtEnd = true
+    for (let i = 0; i < s.length - 1; i++) {
+      if (s[i] === '(') depth++
+      else if (s[i] === ')') {
+        depth--
+        if (depth === 0) {
+          closesAtEnd = false
+          break
+        }
+      }
+    }
+    if (!closesAtEnd) break
+    s = s.slice(1, -1).trim()
+  }
+  return s
+}
+
+/**
  * Resolves LaTeX fractions (including nested, unbraced, and with roots/functions) into readable 'a/b'.
  */
 function resolveFractions(text: string): string {
@@ -106,22 +146,37 @@ function resolveFractions(text: string): string {
     if (!brace1) break
 
     const rest = text.slice(brace1.endIndex + 1)
-    const openBrace2Offset = rest.search(/\S/)
-    if (openBrace2Offset === -1 || rest[openBrace2Offset] !== '{') break
-    const openBrace2 = brace1.endIndex + 1 + openBrace2Offset
-    const brace2 = extractBalancedBraces(text, openBrace2)
-    if (!brace2) break
+    const nextNonSpace = rest.search(/\S/)
+    if (nextNonSpace === -1) break
+
+    let denRaw = ''
+    let replaceEndIndex = brace1.endIndex
+
+    if (rest[nextNonSpace] === '{') {
+      const openBrace2 = brace1.endIndex + 1 + nextNonSpace
+      const brace2 = extractBalancedBraces(text, openBrace2)
+      if (!brace2) break
+      denRaw = brace2.content
+      replaceEndIndex = brace2.endIndex
+    } else if (/[0-9a-zA-Z]/.test(rest[nextNonSpace])) {
+      denRaw = rest[nextNonSpace]
+      replaceEndIndex = brace1.endIndex + 1 + nextNonSpace
+    } else {
+      break
+    }
 
     const num = resolveFractions(cleanMathAndStructuredText(brace1.content)).trim()
-    const den = resolveFractions(cleanMathAndStructuredText(brace2.content)).trim()
+    const den = resolveFractions(cleanMathAndStructuredText(denRaw)).trim()
 
-    const numNeedsParen = /[+\-=]/.test(num) && !num.startsWith('(')
-    const denNeedsParen = /[+\-=]/.test(den) && !den.startsWith('(')
+    const unwrappedNum = unwrapRedundantParens(num)
+    const numNeedsParen = hasTopLevelAdditionOrSubtraction(unwrappedNum)
+    const finalNum = numNeedsParen ? `(${unwrappedNum})` : unwrappedNum
 
-    const finalNum = numNeedsParen ? `(${num})` : num
-    const finalDen = denNeedsParen ? `(${den})` : den
+    const unwrappedDen = unwrapRedundantParens(den)
+    const denNeedsParen = hasTopLevelAdditionOrSubtraction(unwrappedDen)
+    const finalDen = denNeedsParen ? `(${unwrappedDen})` : unwrappedDen
 
-    text = text.slice(0, fracStart) + `${finalNum}/${finalDen}` + text.slice(brace2.endIndex + 1)
+    text = text.slice(0, fracStart) + `${finalNum}/${finalDen}` + text.slice(replaceEndIndex + 1)
     match = fracRegex.exec(text)
   }
   return text

@@ -13,6 +13,7 @@ import {
   ArrowRightLeft
 } from 'lucide-react'
 import { Badge } from '../common/Badge'
+import { FormattedMathText } from '../common/FormattedMathText'
 import type { Question, SectionContent, VisualLayout } from '../../types'
 import { estimateMcqOptionGrid } from '../../utils/mcqLayout'
 
@@ -216,9 +217,9 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
 
       {/* Question Prompt */}
       <div className="space-y-2">
-        <p className="text-sm sm:text-base text-slate-900 leading-relaxed font-medium break-words">
-          {question.prompt}
-        </p>
+        <div className="text-sm sm:text-base text-slate-900 leading-relaxed font-medium break-words">
+          <FormattedMathText text={question.prompt} />
+        </div>
 
         {/* Optional Diagram / Image */}
         {question.diagramUrl && (
@@ -248,7 +249,9 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
                 <span className="font-bold font-mono text-slate-900 shrink-0 mt-0.5">
                   ({opt.label})
                 </span>
-                <span className="flex-1 break-words leading-snug">{opt.text}</span>
+                <div className="flex-1 min-w-0 break-words leading-snug">
+                  <FormattedMathText text={opt.text} isOption={true} />
+                </div>
                 {opt.isCorrect && (
                   <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
                 )}
