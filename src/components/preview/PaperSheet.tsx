@@ -337,7 +337,11 @@ export const PaperSheet: React.FC<PaperSheetProps> = ({
                   </div>
                   <div className="flex items-end gap-2">
                     <span className="font-semibold leading-none">Exam Date:</span>
-                    <span className="flex-1 border-b border-slate-400 mb-[1px]">{settings.date || ''}</span>
+                    <span className="flex-1 border-b border-slate-400 mb-[1px] text-center font-medium text-slate-800 whitespace-nowrap px-1">
+                      {settings.date && settings.date.trim()
+                        ? settings.date.trim().replace(/^(\d{4})-(\d{2})-(\d{2})$/, '$3-$2-$1')
+                        : ''}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -468,30 +472,35 @@ export const PaperSheet: React.FC<PaperSheetProps> = ({
             {/* 2. Candidate Info Block */}
             {page.elements.filter(e => e.type === 'candidate_block').map(el => {
               const cEl = el as any
+              const formattedDate = cEl.examDate && cEl.examDate.trim()
+                ? cEl.examDate.trim().replace(/^(\d{4})-(\d{2})-(\d{2})$/, '$3-$2-$1')
+                : ''
               return (
-                <div key={el.id} className="font-sans text-xs flex flex-wrap items-center justify-between gap-3 px-2 py-1 bg-slate-50/70 rounded">
+                <div key={el.id} className="font-sans text-xs flex flex-wrap items-end justify-between gap-3 sm:gap-5 px-2 py-1.5 bg-slate-50/70 rounded">
                   {cEl.showName && (
-                    <div className="flex items-end gap-1.5 flex-1 min-w-[140px]">
-                      <span className="font-semibold text-slate-700 leading-none">Name:</span>
+                    <div className="flex items-end gap-1.5 flex-1 max-w-[260px] min-w-[120px]">
+                      <span className="font-semibold text-slate-700 leading-none shrink-0">Name:</span>
                       <span className="flex-1 border-b border-slate-400 mb-[1px]"></span>
                     </div>
                   )}
                   {cEl.showRollNo && (
-                    <div className="flex items-end gap-1.5 w-28">
-                      <span className="font-semibold text-slate-700 leading-none">Roll No:</span>
+                    <div className="flex items-end gap-1.5 w-28 sm:w-32 shrink-0">
+                      <span className="font-semibold text-slate-700 leading-none shrink-0">Roll No:</span>
                       <span className="flex-1 border-b border-slate-400 mb-[1px]"></span>
                     </div>
                   )}
                   {cEl.showSection && (
-                    <div className="flex items-end gap-1.5 w-20">
-                      <span className="font-semibold text-slate-700 leading-none">Sec:</span>
+                    <div className="flex items-end gap-1.5 w-20 sm:w-24 shrink-0">
+                      <span className="font-semibold text-slate-700 leading-none shrink-0">Sec:</span>
                       <span className="flex-1 border-b border-slate-400 mb-[1px]"></span>
                     </div>
                   )}
                   {cEl.showDate && (
-                    <div className="flex items-end gap-1.5 w-24">
-                      <span className="font-semibold text-slate-700 leading-none">Date:</span>
-                      <span className="flex-1 border-b border-slate-400 mb-[1px]">{cEl.examDate || ''}</span>
+                    <div className="flex items-end gap-1.5 w-32 sm:w-36 shrink-0">
+                      <span className="font-semibold text-slate-700 leading-none shrink-0">Date:</span>
+                      <span className={`flex-1 border-b border-slate-400 mb-[1px] text-center font-medium text-slate-800 whitespace-nowrap px-1 ${formattedDate ? 'tracking-wider' : ''}`}>
+                        {formattedDate}
+                      </span>
                     </div>
                   )}
                 </div>

@@ -258,7 +258,7 @@ export function paginatePaper({
 
     // Candidate Info Block (if enabled on top of questions)
     const sf = settings.studentFields || { showName: true, showRollNo: true }
-    if (settings.coverPageMode !== 'separate_cover' && (sf.showName || sf.showRollNo)) {
+    if (settings.coverPageMode !== 'separate_cover' && (sf.showName || sf.showRollNo || sf.showDate || sf.showSection)) {
       const candEl: CandidateBlockElement = {
         id: generateId('cand'),
         type: 'candidate_block',
