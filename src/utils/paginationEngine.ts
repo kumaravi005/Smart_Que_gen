@@ -352,9 +352,9 @@ export function paginatePaper({
       pushAndStartNewPage()
     }
 
-    // Section Header Element (compact height reflecting true DOM render)
+    // Section Header Element (compact height reflecting true DOM render + bottom margin)
     const hasInstructions = Boolean(sectionInstructions && sectionInstructions.trim())
-    const sectionHeaderHeight = hasInstructions ? 9.5 : 6.5
+    const sectionHeaderHeight = hasInstructions ? 12 : 9
     const sectionHeaderEl: SectionHeaderPageElement = {
       id: generateId('sec'),
       type: 'section_header',

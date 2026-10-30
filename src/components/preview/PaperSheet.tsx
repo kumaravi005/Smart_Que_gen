@@ -322,22 +322,22 @@ export const PaperSheet: React.FC<PaperSheetProps> = ({
                 Candidate Information
               </h3>
               <div className="space-y-2.5 text-xs">
-                <div className="flex items-center gap-2">
-                  <span className="font-semibold w-24">Student Name:</span>
-                  <span className="flex-1 border-b border-slate-400"></span>
+                <div className="flex items-end gap-2">
+                  <span className="font-semibold w-24 leading-none">Student Name:</span>
+                  <span className="flex-1 border-b border-slate-400 mb-[1px]"></span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="font-semibold w-24">Roll Number:</span>
-                  <span className="flex-1 border-b border-slate-400"></span>
+                <div className="flex items-end gap-2">
+                  <span className="font-semibold w-24 leading-none">Roll Number:</span>
+                  <span className="flex-1 border-b border-slate-400 mb-[1px]"></span>
                 </div>
                 <div className="grid grid-cols-2 gap-4 pt-1">
-                  <div className="flex items-center gap-2">
-                    <span className="font-semibold">Section:</span>
-                    <span className="flex-1 border-b border-slate-400"></span>
+                  <div className="flex items-end gap-2">
+                    <span className="font-semibold leading-none">Section:</span>
+                    <span className="flex-1 border-b border-slate-400 mb-[1px]"></span>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-semibold">Exam Date:</span>
-                    <span className="flex-1 border-b border-slate-400">{settings.date || ''}</span>
+                  <div className="flex items-end gap-2">
+                    <span className="font-semibold leading-none">Exam Date:</span>
+                    <span className="flex-1 border-b border-slate-400 mb-[1px]">{settings.date || ''}</span>
                   </div>
                 </div>
               </div>
@@ -469,23 +469,29 @@ export const PaperSheet: React.FC<PaperSheetProps> = ({
             {page.elements.filter(e => e.type === 'candidate_block').map(el => {
               const cEl = el as any
               return (
-                <div key={el.id} className="pt-1 border-t border-dashed border-slate-300 font-sans text-xs flex flex-wrap items-center justify-between gap-3 px-1.5 bg-slate-50/70 p-1.5 rounded">
+                <div key={el.id} className="font-sans text-xs flex flex-wrap items-center justify-between gap-3 px-2 py-1 bg-slate-50/70 rounded">
                   {cEl.showName && (
-                    <div className="flex items-center gap-1.5 flex-1 min-w-[140px]">
-                      <span className="font-semibold text-slate-600">Name:</span>
-                      <span className="flex-1 border-b border-slate-400"></span>
+                    <div className="flex items-end gap-1.5 flex-1 min-w-[140px]">
+                      <span className="font-semibold text-slate-700 leading-none">Name:</span>
+                      <span className="flex-1 border-b border-slate-400 mb-[1px]"></span>
                     </div>
                   )}
                   {cEl.showRollNo && (
-                    <div className="flex items-center gap-1.5 w-28">
-                      <span className="font-semibold text-slate-600">Roll No:</span>
-                      <span className="flex-1 border-b border-slate-400"></span>
+                    <div className="flex items-end gap-1.5 w-28">
+                      <span className="font-semibold text-slate-700 leading-none">Roll No:</span>
+                      <span className="flex-1 border-b border-slate-400 mb-[1px]"></span>
                     </div>
                   )}
                   {cEl.showSection && (
-                    <div className="flex items-center gap-1.5 w-20">
-                      <span className="font-semibold text-slate-600">Sec:</span>
-                      <span className="flex-1 border-b border-slate-400"></span>
+                    <div className="flex items-end gap-1.5 w-20">
+                      <span className="font-semibold text-slate-700 leading-none">Sec:</span>
+                      <span className="flex-1 border-b border-slate-400 mb-[1px]"></span>
+                    </div>
+                  )}
+                  {cEl.showDate && (
+                    <div className="flex items-end gap-1.5 w-24">
+                      <span className="font-semibold text-slate-700 leading-none">Date:</span>
+                      <span className="flex-1 border-b border-slate-400 mb-[1px]">{cEl.examDate || ''}</span>
                     </div>
                   )}
                 </div>
@@ -519,14 +525,18 @@ export const PaperSheet: React.FC<PaperSheetProps> = ({
                 .map(el => {
                   if (el.type === 'section_header') {
                     const sEl = el as any
+                    const qSpacing = layout.questionSpacingPt || 8
                     return (
                       <div
                         key={el.id}
-                        className={`${isTwoColumn ? 'col-span-2' : ''} text-center font-sans font-bold uppercase text-xs sm:text-sm tracking-wider py-1 bg-slate-100 border-y border-slate-300 mt-2`}
+                        className={`${isTwoColumn ? 'col-span-2' : ''} text-center font-sans font-bold uppercase text-xs sm:text-sm tracking-wider py-1.5 bg-slate-100 border-y border-slate-300 mt-2`}
+                        style={{
+                          marginBottom: `${Math.max(6, Math.round(qSpacing * 0.85))}pt`
+                        }}
                       >
                         <div>{sEl.title}</div>
                         {sEl.instructions && sEl.instructions.trim() && (
-                          <div className="text-[11px] font-normal italic text-slate-600 tracking-normal normal-case">
+                          <div className="text-[11px] font-normal italic text-slate-600 tracking-normal normal-case pt-0.5">
                             {sEl.instructions.trim().startsWith('(') && sEl.instructions.trim().endsWith(')')
                               ? sEl.instructions.trim()
                               : `(${sEl.instructions.trim()})`}
