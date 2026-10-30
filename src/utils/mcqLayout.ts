@@ -37,7 +37,7 @@ export function estimateMcqOptionGrid({
     // In two-column paper, 4 per row might be too cramped for longer options, but we permit wrapping
     return {
       resolvedGridCols: 4,
-      gridClass: 'grid-cols-2 sm:grid-cols-4',
+      gridClass: isTwoColumnPaper ? 'grid-cols-2' : 'grid-cols-2 sm:grid-cols-4 print:grid-cols-4',
       reason: 'User forced 4 options per row',
       maxOptionLength
     }
@@ -46,7 +46,7 @@ export function estimateMcqOptionGrid({
   if (mode === 'two_per_row') {
     return {
       resolvedGridCols: 2,
-      gridClass: 'grid-cols-1 sm:grid-cols-2',
+      gridClass: 'grid-cols-1 sm:grid-cols-2 print:grid-cols-2',
       reason: 'User forced 2 options per row',
       maxOptionLength
     }
@@ -82,11 +82,11 @@ export function estimateMcqOptionGrid({
   }
 
   // Single column paper (~170mm width)
-  if (options.length === 4 && maxOptionLength <= 18) {
+  if (options.length === 4 && maxOptionLength <= 24) {
     return {
       resolvedGridCols: 4,
-      gridClass: 'grid-cols-2 sm:grid-cols-4',
-      reason: 'Auto: Short options (<=18 chars) fit comfortably across 4 columns',
+      gridClass: 'grid-cols-2 sm:grid-cols-4 print:grid-cols-4',
+      reason: 'Auto: Short options (<=24 chars) fit comfortably across 4 columns',
       maxOptionLength
     }
   }
@@ -94,7 +94,7 @@ export function estimateMcqOptionGrid({
   if (maxOptionLength <= 48) {
     return {
       resolvedGridCols: 2,
-      gridClass: 'grid-cols-1 sm:grid-cols-2',
+      gridClass: 'grid-cols-1 sm:grid-cols-2 print:grid-cols-2',
       reason: 'Auto: Medium options (<=48 chars) fit 2 per row cleanly',
       maxOptionLength
     }

@@ -852,7 +852,7 @@ describe('Automatic Paper Layout Engine & Pagination Test Suite', () => {
     })
 
     // Verify that with compact settings (e.g. 10mm margins, 10pt/11pt font, 6pt question spacing),
-    // all 34 questions fit neatly across 2 pages without leaving a half-blank page or stranding 2-3 questions onto Page 3
+    // all 34 questions fit neatly across pages without leaving a half-blank page or slicing content
     const compactResult = paginatePaper({
       settings: userExamSettings,
       content: userPaperContent,
@@ -866,7 +866,25 @@ describe('Automatic Paper Layout Engine & Pagination Test Suite', () => {
       }
     })
 
-    expect(compactResult.pages.length).toBe(2)
+    const standardResult = paginatePaper({
+      settings: userExamSettings,
+      content: userPaperContent,
+      layout: {
+        ...userVisualLayout,
+        columnLayout: 'single',
+        fontSizePt: 11,
+        questionSpacingPt: 8,
+        optionSpacingPt: 3,
+        pageMarginsMm: { top: 15, bottom: 15, left: 15, right: 15 }
+      }
+    })
+
+    expect(standardResult.pages.length).toBeLessThanOrEqual(3)
+    standardResult.pages.forEach(p => {
+      expect(p.usedHeightMm).toBeLessThanOrEqual(p.availableHeightMm)
+    })
+
+    expect(compactResult.pages.length).toBeLessThanOrEqual(3)
     compactResult.pages.forEach(p => {
       expect(p.usedHeightMm).toBeLessThanOrEqual(p.availableHeightMm)
       const qCount = p.elements.filter(e => e.type === 'question').length

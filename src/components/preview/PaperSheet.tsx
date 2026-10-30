@@ -253,7 +253,7 @@ export const PaperSheet: React.FC<PaperSheetProps> = ({
           })}
         </div>
       ) : (
-      <div className="relative z-10 flex-1 flex flex-col space-y-4">
+      <div className="relative z-10 flex-1 flex flex-col space-y-2">
         {/* Render Page Elements */}
         {page.isCoverPage ? (
           // DEDICATED COVER PAGE
@@ -367,7 +367,7 @@ export const PaperSheet: React.FC<PaperSheetProps> = ({
           </div>
         ) : (
           // REGULAR QUESTION SHEET ELEMENTS
-          <div className="space-y-4">
+          <div className="space-y-2">
             {/* 1. Header Elements */}
             {page.elements.filter(e => e.type === 'header').map(el => {
               const hEl = el as any
@@ -668,7 +668,7 @@ export const PaperSheet: React.FC<PaperSheetProps> = ({
 
       {/* Running Footer Note & Dynamic Page Number */}
       {!page.isCoverPage && !isManualMode && hasFooter && (
-        <div className="relative z-10 pt-3 border-t border-slate-300 flex items-center justify-between font-sans text-[11px] text-slate-500 mt-4">
+        <div className="relative z-10 pt-2.5 border-t border-slate-300 flex items-center justify-between font-sans text-[11px] text-slate-500 mt-2">
           <div className="truncate max-w-[70%]">
             {showExamName && <span>{settings.subject} — {settings.examName}</span>}
             {showExamName && showRunningFooter && <span> | </span>}
