@@ -63,21 +63,21 @@ export function estimateQuestionHeightMm(
   optionsLayoutMode: McqOptionLayoutMode = 'auto',
   optionSpacingPt: number = 3
 ): number {
-  // In 2-column mode, column width is ~85mm (fits ~42-45 chars at 11pt, including Devanagari/Hindi)
-  // In single-column mode, column width is ~170mm-190mm (fits ~85-95 chars at 11pt)
-  const charsPerLine = isTwoColumn ? 42 : 88
+  // In 2-column mode, column width is ~85mm (fits ~40-42 chars at 11pt, including Devanagari/Hindi)
+  // In single-column mode, column width is ~170mm-190mm (fits ~80-86 chars at 11pt)
+  const charsPerLine = isTwoColumn ? 40 : 82
   const cleanPrompt = (q.prompt || '').trim()
   const promptLines = Math.max(1, Math.ceil(cleanPrompt.length / charsPerLine))
   const lineSpacingFactor = Math.max(1, lineSpacing) / 1.15
   const fontFactor = Math.max(0.85, fontSizePt / 11)
   const optSpacingMm = (optionSpacingPt || 3) * 0.3527
 
-  // 1 prompt line in Hindi/English with marks and Q number is ~4.2mm in rendered DOM
-  let height = promptLines * 4.2 * lineSpacingFactor * fontFactor
+  // 1 prompt line in Hindi/English with marks and Q number is ~4.6mm in rendered DOM
+  let height = promptLines * 4.6 * lineSpacingFactor * fontFactor
 
   // Specific instructions
   if (q.instructions) {
-    height += 3.5
+    height += 3.8
   }
 
   // Diagram / Image
@@ -95,23 +95,23 @@ export function estimateQuestionHeightMm(
 
     if (estimation.resolvedGridCols === 4) {
       // 1 row of 4 options
-      height += Math.max(4.5, 4.2 * fontFactor * lineSpacingFactor) + optSpacingMm * 0.4
+      height += Math.max(4.8, 4.5 * fontFactor * lineSpacingFactor) + optSpacingMm * 0.4
     } else if (estimation.resolvedGridCols === 2) {
-      // 2 rows of 2 options: each row is ~4.2mm + rowGap
+      // 2 rows of 2 options: each row is ~4.5mm + rowGap
       const rows = Math.ceil(q.options.length / 2)
       // Check if any option wraps to 2 lines
       const maxOptLen = Math.max(...q.options.map(o => (o.text || '').trim().length), 0)
-      const hasWrap = maxOptLen > (isTwoColumn ? 22 : 45)
+      const hasWrap = maxOptLen > (isTwoColumn ? 22 : 44)
       const effectiveRows = rows + (hasWrap ? 0.8 : 0)
-      height += effectiveRows * (4.2 * fontFactor * lineSpacingFactor) + (rows - 1) * optSpacingMm + optSpacingMm * 0.4
+      height += effectiveRows * (4.5 * fontFactor * lineSpacingFactor) + (rows - 1) * optSpacingMm + optSpacingMm * 0.4
     } else {
       // Stacked vertically: account for long option wrapping
       let optHeight = 0
       for (const opt of q.options) {
-        const optLines = Math.max(1, Math.ceil((opt.text || '').trim().length / (isTwoColumn ? 36 : 75)))
-        optHeight += optLines * (3.8 * fontFactor * lineSpacingFactor)
+        const optLines = Math.max(1, Math.ceil((opt.text || '').trim().length / (isTwoColumn ? 35 : 72)))
+        optHeight += optLines * (4.0 * fontFactor * lineSpacingFactor)
       }
-      height += Math.max(q.options.length * 3.8 * fontFactor * lineSpacingFactor, optHeight) + (q.options.length - 1) * optSpacingMm + optSpacingMm * 0.4
+      height += Math.max(q.options.length * 4.0 * fontFactor * lineSpacingFactor, optHeight) + (q.options.length - 1) * optSpacingMm + optSpacingMm * 0.4
     }
   }
 
@@ -120,9 +120,9 @@ export function estimateQuestionHeightMm(
     height += q.writingSpaceLines * 4.8
   }
 
-  // Spacing between questions (reflects user's questionSpacingPt slider, min 2mm)
+  // Spacing between questions (reflects user's questionSpacingPt slider, min 2.2mm)
   const qSpacingMm = (questionSpacingPt || 8) * 0.3527
-  height += Math.max(2.0, qSpacingMm)
+  height += Math.max(2.2, qSpacingMm)
 
   return Math.round(height * 10) / 10
 }
@@ -158,7 +158,7 @@ export function paginatePaper({
   const hasFooter = showRunningFooter || showExamName || showPageNumbers
   const footerHeight = hasFooter ? 16 : 0
 
-  const safetyBuffer = 3.5 // Margin buffer to prevent content from touching the footer boundary
+  const safetyBuffer = 8 // Strict print margin buffer guaranteeing content never spills over physical A4
   const physicalAvailableHeight = Math.max(100, usablePageHeight - footerHeight)
   const targetUsableHeight = Math.max(90, physicalAvailableHeight - safetyBuffer)
 
@@ -334,7 +334,6 @@ export function paginatePaper({
     return (sec.questions && sec.questions.length > 0) || contentSecs.length === 1
   })
 
-  const totalExamQuestions = allSections.reduce((acc, s) => acc + (s.questions?.length || 0), 0)
   let globalQuestionIndex = 0
 
   for (let sIdx = 0; sIdx < allSections.length; sIdx++) {
@@ -407,13 +406,6 @@ export function paginatePaper({
       })
       globalQuestionIndex++
 
-      // Elasticity calculation:
-      // When near the end of the paper (<=3 questions remaining), allow up to 3.0mm elasticity
-      // into the margin safety buffer to avoid stranding 1-2 questions on a nearly blank page.
-      // Standard elasticity is 1.5mm to absorb minor DOM line variances.
-      const remainingQuestionsInPaper = totalExamQuestions - globalQuestionIndex
-      const elasticityMm = remainingQuestionsInPaper <= 3 ? 3.0 : 1.5
-
       // Two-column row tracking vs Single-column tracking
       if (isTwoColumn) {
         if (pendingCol0Height === 0) {
@@ -425,7 +417,7 @@ export function paginatePaper({
           const expectedRowHeight = Math.max(qHeight, nextQHeight)
 
           const remaining = targetUsableHeight - currentPage.usedHeightMm
-          if (expectedRowHeight > (remaining + elasticityMm) && currentPage.elements.some(e => e.type === 'question')) {
+          if (expectedRowHeight > remaining && currentPage.elements.some(e => e.type === 'question')) {
             pushAndStartNewPage()
           }
           pendingCol0Height = qHeight
@@ -439,7 +431,7 @@ export function paginatePaper({
       } else {
         // Single column: check if question fits on current page
         const remaining = targetUsableHeight - currentPage.usedHeightMm
-        if (qHeight > (remaining + elasticityMm) && currentPage.elements.some(e => e.type === 'question')) {
+        if (qHeight > remaining && currentPage.elements.some(e => e.type === 'question')) {
           pushAndStartNewPage()
         }
         currentPage.usedHeightMm += qHeight

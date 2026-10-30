@@ -866,6 +866,29 @@ describe('Automatic Paper Layout Engine & Pagination Test Suite', () => {
       }
     })
 
+    expect(compactResult.pages.length).toBe(2)
+    compactResult.pages.forEach(p => {
+      expect(p.usedHeightMm).toBeLessThanOrEqual(p.availableHeightMm)
+    })
+
+    const twoColResult = paginatePaper({
+      settings: userExamSettings,
+      content: userPaperContent,
+      layout: {
+        ...userVisualLayout,
+        columnLayout: 'two_column',
+        fontSizePt: 10,
+        questionSpacingPt: 6,
+        optionSpacingPt: 3,
+        pageMarginsMm: { top: 10, bottom: 10, left: 10, right: 10 }
+      }
+    })
+
+    expect(twoColResult.pages.length).toBe(2)
+    twoColResult.pages.forEach(p => {
+      expect(p.usedHeightMm).toBeLessThanOrEqual(p.availableHeightMm)
+    })
+
     const standardResult = paginatePaper({
       settings: userExamSettings,
       content: userPaperContent,
