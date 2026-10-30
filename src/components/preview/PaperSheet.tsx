@@ -32,15 +32,42 @@ export const PaperSheet: React.FC<PaperSheetProps> = ({
   const isTwoColumn = page.hasTwoColumns
   const margins = layout.pageMarginsMm || { top: 15, bottom: 15, left: 15, right: 15 }
   const hf = layout.headerFooter || {
-    logoPlacement: 'center',
+    logoPlacement: layout.logoPlacement || 'center',
     showInstitutionName: true,
     showAddress: true,
     separatorLineStyle: 'single',
     borderStyle: 'none',
-    showPageNumbers: true,
+    showPageNumbers: layout.showPageNumbers ?? true,
     pageNumberPosition: 'bottom_center',
     showExamNameInFooter: true
   }
+
+  const currentLogoPlacement = hf.logoPlacement || layout.logoPlacement || 'center'
+  const showLogo =
+    layout.showInstituteLogo !== false &&
+    layout.logoPlacement !== 'none' &&
+    currentLogoPlacement !== 'none'
+
+  const instNameSize = hf.institutionNameSizePt || 22
+  const instNameAlign = hf.institutionNameAlign || 'center'
+  const taglineSize = hf.taglineSizePt || 11
+  const taglineAlign = hf.taglineAlign || 'center'
+  const addressSize = hf.addressSizePt || 9.5
+  const addressAlign = hf.addressAlign || 'center'
+  const logoSizeMm = hf.logoWidthMm || layout.logoWidthMm || 24
+  const logoHeightMm = hf.logoHeightMm || layout.logoHeightMm
+
+  const alignClassMap: Record<string, string> = {
+    left: 'text-left',
+    center: 'text-center',
+    right: 'text-right'
+  }
+
+  const rawFooterText = (hf.footerCustomText !== undefined ? hf.footerCustomText : layout.footerNote) || ''
+  const showRunningFooter = hf.showRunningFooter !== false && rawFooterText.trim().length > 0
+  const showExamName = Boolean(hf.showExamNameInFooter)
+  const showPageNumbers = hf.showPageNumbers !== false && layout.showPageNumbers !== false
+  const hasFooter = showRunningFooter || showExamName || showPageNumbers
 
   const separatorClass =
     hf.separatorLineStyle === 'double'
@@ -51,10 +78,10 @@ export const PaperSheet: React.FC<PaperSheetProps> = ({
 
   const borderContainerClass =
     hf.borderStyle === 'outer_box'
-      ? 'border-4 border-slate-900'
+      ? 'border-2 sm:border-4 border-slate-900'
       : hf.borderStyle === 'header_box'
-      ? ''
-      : 'border border-slate-300'
+      ? 'border border-slate-300 print:border-none'
+      : 'border border-slate-300 print:border-none'
 
   const fontFamilyStyle =
     layout.fontFamily === 'serif'
@@ -80,7 +107,7 @@ export const PaperSheet: React.FC<PaperSheetProps> = ({
 
   return (
     <div
-      className={`paper-sheet relative mx-auto bg-white shadow-xl ${borderContainerClass} print:shadow-none print:border-none print:m-0 print:p-0 rounded-md flex flex-col justify-between transition-all duration-200 select-text`}
+      className={`paper-sheet ${isLandscape ? 'is-landscape' : ''} relative mx-auto bg-white shadow-xl ${borderContainerClass} print:shadow-none print:m-0 rounded-md flex flex-col justify-between transition-all duration-200 select-text`}
       style={{
         ...sheetDimensionsStyle,
         paddingTop: isManualMode ? 0 : `${margins.top}mm`,
@@ -232,23 +259,41 @@ export const PaperSheet: React.FC<PaperSheetProps> = ({
           // DEDICATED COVER PAGE
           <div className="flex-1 flex flex-col justify-between py-6 text-center space-y-6">
             <div className="space-y-3">
-              {hf.logoPlacement !== 'none' && (
-                <img
-                  src={settings.institute.logoUrl || '/omega-logo.png'}
-                  alt="Logo"
-                  className="w-20 h-20 object-contain mx-auto mb-2"
-                />
+              {showLogo && (
+                <div className="flex justify-center mb-2 w-full">
+                  <img
+                    src={settings.institute.logoUrl || '/omega-logo.png'}
+                    alt="Logo"
+                    style={{
+                      width: `${Math.min(185, logoSizeMm * 1.3)}mm`,
+                      maxWidth: '100%',
+                      height: logoHeightMm ? `${logoHeightMm * 1.3}mm` : 'auto',
+                      maxHeight: logoHeightMm ? `${logoHeightMm * 1.3}mm` : '85mm',
+                      objectFit: 'contain'
+                    }}
+                    className="object-contain mx-auto"
+                  />
+                </div>
               )}
-              <h1 className="text-3xl font-extrabold uppercase tracking-wide">
+              <h1
+                style={{ fontSize: `${instNameSize * 1.3}pt`, lineHeight: 1.2 }}
+                className={`font-extrabold uppercase tracking-wide block ${alignClassMap[instNameAlign] || 'text-center'}`}
+              >
                 {settings.institute.name}
               </h1>
               {settings.institute.tagline && (
-                <p className="text-sm italic font-sans text-slate-600">
+                <p
+                  style={{ fontSize: `${taglineSize * 1.3}pt`, lineHeight: 1.3 }}
+                  className={`italic font-sans text-slate-600 block ${alignClassMap[taglineAlign] || 'text-center'}`}
+                >
                   {settings.institute.tagline}
                 </p>
               )}
               {settings.institute.address && (
-                <p className="text-xs font-sans text-slate-500">
+                <p
+                  style={{ fontSize: `${addressSize * 1.2}pt`, lineHeight: 1.3 }}
+                  className={`font-sans text-slate-500 block ${alignClassMap[addressAlign] || 'text-center'}`}
+                >
                   {settings.institute.address}
                 </p>
               )}
@@ -336,32 +381,70 @@ export const PaperSheet: React.FC<PaperSheetProps> = ({
               return (
                 <div key={el.id} className={`space-y-1 pb-3 ${separatorClass}`}>
                   <div className={`flex flex-col ${
-                    hf.logoPlacement === 'left' ? 'sm:flex-row items-center gap-4 text-left' :
-                    hf.logoPlacement === 'right' ? 'sm:flex-row-reverse items-center gap-4 text-right' :
+                    showLogo && currentLogoPlacement === 'left' ? 'sm:flex-row items-center gap-4' :
+                    showLogo && currentLogoPlacement === 'right' ? 'sm:flex-row-reverse items-center gap-4' :
                     'text-center'
                   }`}>
-                    {hf.logoPlacement !== 'none' && (
-                      <img
-                        src={settings.institute.logoUrl || '/omega-logo.png'}
-                        alt="Logo"
-                        className="w-14 h-14 object-contain shrink-0 mx-auto sm:mx-0 mb-1"
-                      />
+                    {showLogo && (
+                      <div className={`shrink-0 ${currentLogoPlacement === 'center' ? 'flex justify-center mb-1.5 w-full' : ''}`}>
+                        <img
+                          src={settings.institute.logoUrl || '/omega-logo.png'}
+                          alt="Logo"
+                          style={{
+                            width: `${logoSizeMm}mm`,
+                            maxWidth: '100%',
+                            height: logoHeightMm ? `${logoHeightMm}mm` : 'auto',
+                            maxHeight: logoHeightMm ? `${logoHeightMm}mm` : '75mm',
+                            objectFit: 'contain'
+                          }}
+                          className="object-contain"
+                        />
+                      </div>
                     )}
 
-                    <div className="flex-1">
+                    <div className="flex-1 w-full min-w-0 space-y-1">
                       {hf.showInstitutionName && (
-                        <h1 className="text-xl sm:text-2xl font-extrabold uppercase tracking-wide">
+                        <h1
+                          style={{
+                            fontSize: `${instNameSize}pt`,
+                            lineHeight: 1.2
+                          }}
+                          className={`w-full font-extrabold uppercase tracking-wide text-slate-900 block ${alignClassMap[instNameAlign] || 'text-center'}`}
+                        >
                           {settings.institute.name}
                         </h1>
                       )}
                       {settings.institute.tagline && (
-                        <p className="text-xs italic font-sans text-slate-700">
+                        <p
+                          style={{
+                            fontSize: `${taglineSize}pt`,
+                            lineHeight: 1.3
+                          }}
+                          className={`w-full italic font-sans text-slate-700 block ${alignClassMap[taglineAlign] || 'text-center'}`}
+                        >
                           {settings.institute.tagline}
                         </p>
                       )}
                       {hf.showAddress && settings.institute.address && (
-                        <p className="text-[11px] font-sans text-slate-600">
+                        <p
+                          style={{
+                            fontSize: `${addressSize}pt`,
+                            lineHeight: 1.3
+                          }}
+                          className={`w-full font-sans text-slate-600 block ${alignClassMap[addressAlign] || 'text-center'}`}
+                        >
                           {settings.institute.address}
+                        </p>
+                      )}
+                      {hf.showContact && settings.institute.contact && (
+                        <p
+                          style={{
+                            fontSize: `${addressSize * 0.95}pt`,
+                            lineHeight: 1.3
+                          }}
+                          className={`w-full font-sans text-slate-500 block ${alignClassMap[addressAlign] || 'text-center'}`}
+                        >
+                          {settings.institute.contact}
                         </p>
                       )}
                     </div>
@@ -427,7 +510,10 @@ export const PaperSheet: React.FC<PaperSheetProps> = ({
             })}
 
             {/* 4. Section Headers & Questions Container */}
-            <div className={isTwoColumn ? 'grid grid-cols-2 gap-x-6 gap-y-3' : 'space-y-3'}>
+            <div
+              className={isTwoColumn ? 'grid grid-cols-2 gap-x-6' : 'space-y-0'}
+              style={{ rowGap: `${layout.questionSpacingPt || 8}pt` }}
+            >
               {page.elements
                 .filter(e => e.type === 'section_header' || e.type === 'question')
                 .map(el => {
@@ -439,9 +525,11 @@ export const PaperSheet: React.FC<PaperSheetProps> = ({
                         className={`${isTwoColumn ? 'col-span-2' : ''} text-center font-sans font-bold uppercase text-xs sm:text-sm tracking-wider py-1 bg-slate-100 border-y border-slate-300 mt-2`}
                       >
                         <div>{sEl.title}</div>
-                        {sEl.instructions && (
-                          <div className="text-[11px] font-normal italic lowercase text-slate-600 tracking-normal">
-                            ({sEl.instructions})
+                        {sEl.instructions && sEl.instructions.trim() && (
+                          <div className="text-[11px] font-normal italic text-slate-600 tracking-normal normal-case">
+                            {sEl.instructions.trim().startsWith('(') && sEl.instructions.trim().endsWith(')')
+                              ? sEl.instructions.trim()
+                              : `(${sEl.instructions.trim()})`}
                           </div>
                         )}
                       </div>
@@ -459,6 +547,10 @@ export const PaperSheet: React.FC<PaperSheetProps> = ({
                     columnLayout: isTwoColumn ? 'two_column' : 'single'
                   })
 
+                  const optionSpacingPt = layout.optionSpacingPt ?? 3
+                  const questionSpacingPt = layout.questionSpacingPt ?? 8
+                  const lineSpacing = layout.lineSpacing || 1.25
+
                   return (
                     <div
                       key={el.id}
@@ -467,13 +559,21 @@ export const PaperSheet: React.FC<PaperSheetProps> = ({
                       }`}
                       style={{
                         fontSize: `${layout.fontSizePt || 11}pt`,
-                        lineHeight: layout.lineSpacing || 1.25
+                        lineHeight: lineSpacing,
+                        marginBottom: isTwoColumn ? undefined : `${questionSpacingPt}pt`
                       }}
                     >
                       <div className="flex items-start justify-between gap-2.5">
                         <div className="flex items-start gap-1.5 flex-1 min-w-0">
                           <span className="font-bold shrink-0">{qEl.displayNumber}</span>
-                          <div className="space-y-1.5 flex-1 min-w-0">
+                          <div
+                            className="flex-1 min-w-0"
+                            style={{
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: `${Math.max(1, optionSpacingPt * 0.4)}pt`
+                            }}
+                          >
                             {/* Specific instruction if present */}
                             {q.instructions && (
                               <p className="text-[11px] font-sans italic text-slate-600">
@@ -482,7 +582,7 @@ export const PaperSheet: React.FC<PaperSheetProps> = ({
                             )}
 
                             {/* Prompt */}
-                            <div className="leading-relaxed break-words font-medium text-slate-900">
+                            <div className="break-words font-medium text-slate-900" style={{ lineHeight: lineSpacing }}>
                               <FormattedMathText text={cleanQuestionPrompt(q.prompt)} />
                             </div>
 
@@ -499,9 +599,20 @@ export const PaperSheet: React.FC<PaperSheetProps> = ({
 
                             {/* Smart MCQ Options */}
                             {q.options && q.options.length > 0 && (
-                              <div className={`pt-1 font-sans text-xs grid ${mcqGrid.gridClass} gap-x-3 gap-y-1`}>
+                              <div
+                                className={`font-sans text-xs grid ${mcqGrid.gridClass} gap-x-3`}
+                                style={{
+                                  rowGap: `${optionSpacingPt}pt`,
+                                  marginTop: `${Math.max(1, optionSpacingPt * 0.35)}pt`,
+                                  lineHeight: lineSpacing
+                                }}
+                              >
                                 {q.options.map((opt: any) => (
-                                  <div key={opt.id} className="flex items-center gap-1.5 break-words min-h-[30px]">
+                                  <div
+                                    key={opt.id}
+                                    className="flex items-baseline gap-1.5 break-words min-h-0"
+                                    style={{ lineHeight: lineSpacing }}
+                                  >
                                     <span className="font-bold shrink-0">({opt.label})</span>
                                     <FormattedMathText text={opt.text} isOption={true} />
                                   </div>
@@ -537,13 +648,14 @@ export const PaperSheet: React.FC<PaperSheetProps> = ({
       )}
 
       {/* Running Footer Note & Dynamic Page Number */}
-      {!page.isCoverPage && !isManualMode && (
+      {!page.isCoverPage && !isManualMode && hasFooter && (
         <div className="relative z-10 pt-3 border-t border-slate-300 flex items-center justify-between font-sans text-[11px] text-slate-500 mt-4">
           <div className="truncate max-w-[70%]">
-            {hf.showExamNameInFooter ? `${settings.subject} — ${settings.examName} | ` : ''}
-            {hf.footerCustomText || layout.footerNote || ''}
+            {showExamName && <span>{settings.subject} — {settings.examName}</span>}
+            {showExamName && showRunningFooter && <span> | </span>}
+            {showRunningFooter && <span>{rawFooterText}</span>}
           </div>
-          {hf.showPageNumbers && (
+          {showPageNumbers && (
             <div className="font-bold font-mono">
               Page {page.pageNumber} of {totalPages}
             </div>

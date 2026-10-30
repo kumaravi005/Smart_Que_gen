@@ -105,10 +105,17 @@ export function exportWordDocument(paper: FullPaper): void {
 
   if (sections.length > 0) {
     sections.forEach(sec => {
+      const secConfig = settings.sections?.find(s => s.id === sec.sectionId)
+      if (secConfig && secConfig.enabled === false) return
+
       const secQs = sec.questions || []
       if (secQs.length === 0) return
+
+      const secTitle = (secConfig?.title && secConfig.title.trim()) || sec.title
+      const secInstructions = secConfig?.instructions !== undefined ? secConfig.instructions : sec.instructions
+
       html += `
-        <div class="section-header">${sec.title} ${sec.instructions ? `— ${sec.instructions}` : ''}</div>
+        <div class="section-header">${secTitle} ${secInstructions ? `— ${secInstructions}` : ''}</div>
       `
       secQs.forEach(q => {
         html += renderQuestionWordHtml(q, globalIndex++)

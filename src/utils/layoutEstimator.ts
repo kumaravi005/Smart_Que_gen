@@ -49,7 +49,7 @@ export function estimatePageFit(
 
   for (const sec of enabledSections) {
     // Section Header height
-    totalHeightMm += 10
+    totalHeightMm += (sec.instructions && sec.instructions.trim()) ? 16 : 10
 
     const qCount = sec.totalQuestions || 0
     const primaryType = sec.targetTypes?.[0] || 'mcq'

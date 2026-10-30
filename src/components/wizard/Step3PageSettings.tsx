@@ -314,7 +314,7 @@ export const Step3PageSettings: React.FC<Step3Props> = ({
           <span>Typography, Line Spacing & Question Spacing</span>
         </h3>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <div>
             <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">
               Font Family
@@ -326,6 +326,7 @@ export const Step3PageSettings: React.FC<Step3Props> = ({
             >
               <option value="sans">Inter (Modern Clean Sans-Serif)</option>
               <option value="serif">Times New Roman (Formal Board Serif)</option>
+              <option value="dejavu">DejaVu Serif (Academic Book Serif)</option>
               <option value="system">System Default</option>
             </select>
           </div>
@@ -339,7 +340,7 @@ export const Step3PageSettings: React.FC<Step3Props> = ({
             </div>
             <input
               type="range"
-              min="9"
+              min="8.5"
               max="13"
               step="0.5"
               value={layout.fontSizePt}
@@ -347,9 +348,33 @@ export const Step3PageSettings: React.FC<Step3Props> = ({
               className="w-full accent-blue-600"
             />
             <div className="flex justify-between text-[10px] text-slate-400 mt-0.5">
-              <span>9pt (Dense)</span>
+              <span>8.5pt (Dense)</span>
               <span>11pt (Default)</span>
               <span>13pt (Large)</span>
+            </div>
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-xs font-semibold text-slate-700 uppercase">
+                Line Spacing: {layout.lineSpacing || 1.25}x
+              </label>
+              <span className="text-xs text-slate-500 font-mono">Line height</span>
+            </div>
+            <input
+              type="range"
+              min="1.0"
+              max="1.6"
+              step="0.05"
+              value={layout.lineSpacing || 1.25}
+              onChange={e => onChange({ lineSpacing: Number(e.target.value) })}
+              className="w-full accent-blue-600"
+            />
+            <div className="flex justify-between text-[10px] text-slate-400 mt-0.5">
+              <span>1.0x (Tight)</span>
+              <span>1.15x</span>
+              <span>1.25x (Default)</span>
+              <span>1.6x (Wide)</span>
             </div>
           </div>
 
@@ -362,7 +387,7 @@ export const Step3PageSettings: React.FC<Step3Props> = ({
             </div>
             <input
               type="range"
-              min="6"
+              min="2"
               max="20"
               step="1"
               value={layout.questionSpacingPt}
@@ -370,7 +395,8 @@ export const Step3PageSettings: React.FC<Step3Props> = ({
               className="w-full accent-blue-600"
             />
             <div className="flex justify-between text-[10px] text-slate-400 mt-0.5">
-              <span>6pt (Compact)</span>
+              <span>2pt (Compact)</span>
+              <span>6pt</span>
               <span>10pt (Default)</span>
               <span>20pt (Wide)</span>
             </div>
@@ -379,23 +405,77 @@ export const Step3PageSettings: React.FC<Step3Props> = ({
           <div>
             <div className="flex items-center justify-between mb-1">
               <label className="text-xs font-semibold text-slate-700 uppercase">
-                Option Spacing: {layout.optionSpacingPt || 6}pt
+                Option Spacing: {layout.optionSpacingPt ?? 3}pt
               </label>
               <span className="text-xs text-slate-500 font-mono">Gap between choices</span>
             </div>
             <input
               type="range"
-              min="3"
-              max="14"
+              min="1"
+              max="12"
               step="1"
-              value={layout.optionSpacingPt || 6}
+              value={layout.optionSpacingPt ?? 3}
               onChange={e => onChange({ optionSpacingPt: Number(e.target.value) })}
               className="w-full accent-blue-600"
             />
             <div className="flex justify-between text-[10px] text-slate-400 mt-0.5">
-              <span>3pt</span>
+              <span>1pt (Tight)</span>
+              <span>3pt (Compact)</span>
               <span>6pt (Default)</span>
-              <span>14pt</span>
+              <span>12pt (Wide)</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Live Typography & Spacing Preview */}
+        <div className="p-3.5 bg-slate-50 border border-slate-200/90 rounded-2xl space-y-2">
+          <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center justify-between">
+            <span>Live Typography & Option Spacing Preview</span>
+            <span className="text-[10px] font-mono text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200">
+              {layout.fontSizePt}pt • {layout.lineSpacing || 1.25}x • Option Gap: {layout.optionSpacingPt ?? 3}pt
+            </span>
+          </div>
+          <div
+            className="p-3 bg-white border border-slate-200 rounded-xl select-none"
+            style={{
+              fontFamily:
+                layout.fontFamily === 'serif'
+                  ? 'Times New Roman, Cambria, Georgia, serif'
+                  : layout.fontFamily === 'dejavu'
+                  ? 'DejaVu Serif, Georgia, serif'
+                  : 'Inter, system-ui, sans-serif',
+              fontSize: `${layout.fontSizePt || 11}pt`,
+              lineHeight: layout.lineSpacing || 1.25
+            }}
+          >
+            <div className="flex justify-between items-baseline font-semibold text-slate-900">
+              <span>Q1. 'तिरिछ' कहानी के लेखक कौन हैं?</span>
+              <span className="text-xs font-bold text-slate-500 shrink-0 ml-2">[1]</span>
+            </div>
+            <div
+              className="grid grid-cols-2 gap-x-4 font-sans text-xs"
+              style={{
+                rowGap: `${layout.optionSpacingPt ?? 3}pt`,
+                marginTop: `${Math.max(1, (layout.optionSpacingPt ?? 3) * 0.35)}pt`,
+                lineHeight: layout.lineSpacing || 1.25
+              }}
+            >
+              <div className="flex items-baseline gap-1.5 min-h-0">
+                <span className="font-bold shrink-0">(A)</span>
+                <span>उदय प्रकाश</span>
+              </div>
+              <div className="flex items-baseline gap-1.5 min-h-0">
+                <span className="font-bold shrink-0">(B)</span>
+                <span>प्रेमचंद</span>
+              </div>
+              <div className="flex items-baseline gap-1.5 min-h-0">
+                <span className="font-bold shrink-0">(C)</span>
+                <span>फणीश्वरनाथ रेणु</span>
+              </div>
+              <div className="flex items-baseline gap-1.5 min-h-0">
+                <span className="font-bold shrink-0">(D)</span>
+                <span>मोहन राकेश</span>
+              </div>
             </div>
           </div>
         </div>

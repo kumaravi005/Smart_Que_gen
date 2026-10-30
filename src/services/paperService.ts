@@ -6,12 +6,103 @@ import type {
   VisualLayout,
   FullPaper,
   ExamSectionConfig,
-  PaperSetupTemplate
+  PaperSetupTemplate,
+  SectionContent
 } from '../types'
 import { generateUuid } from '../utils/uuid'
 import { syncQueue } from './syncQueue'
 import { syncService } from './syncService'
 import { supabase, isSupabaseConfigured } from './supabaseClient'
+
+export function syncContentSectionsWithSettings(content: PaperContent, settings: ExamSettings): boolean {
+  if (!content || !settings || !settings.sections || settings.sections.length === 0) {
+    return false
+  }
+
+  let changed = false
+  const existingSections = content.sections || []
+  const syncedSections: SectionContent[] = []
+  const claimedExistingIndices = new Set<number>()
+
+  // First pass: find direct ID matches
+  const idMatchMap = new Map<string, number>()
+  for (let i = 0; i < existingSections.length; i++) {
+    idMatchMap.set(existingSections[i].sectionId, i)
+  }
+
+  // 1. Process all sections configured in settings in their exact configured order
+  for (let idx = 0; idx < settings.sections.length; idx++) {
+    const secConf = settings.sections[idx]
+    let existingIndex: number | undefined
+
+    if (idMatchMap.has(secConf.id)) {
+      existingIndex = idMatchMap.get(secConf.id)
+    } else {
+      // Fallback: check if the existing section at this index is an orphan not matched by any setting
+      if (
+        idx < existingSections.length &&
+        !claimedExistingIndices.has(idx) &&
+        !settings.sections.some(s => s.id === existingSections[idx].sectionId)
+      ) {
+        existingIndex = idx
+      }
+    }
+
+    const existing = existingIndex !== undefined ? existingSections[existingIndex] : undefined
+    if (existingIndex !== undefined) {
+      claimedExistingIndices.add(existingIndex)
+    }
+
+    const expectedTitle = (secConf.title && secConf.title.trim()) || existing?.title || 'Section'
+    const expectedInstructions = secConf.instructions !== undefined ? secConf.instructions : existing?.instructions
+
+    if (existing) {
+      if (existing.title !== expectedTitle || existing.instructions !== expectedInstructions) {
+        changed = true
+      }
+      syncedSections.push({
+        ...existing,
+        sectionId: existing.sectionId || secConf.id,
+        title: expectedTitle,
+        instructions: expectedInstructions
+      })
+    } else {
+      changed = true
+      syncedSections.push({
+        sectionId: secConf.id,
+        title: expectedTitle,
+        instructions: expectedInstructions,
+        questions: []
+      })
+    }
+  }
+
+  // 2. Retain any remaining unclaimed extra sections that already hold questions so no user question is ever lost
+  for (let i = 0; i < existingSections.length; i++) {
+    if (!claimedExistingIndices.has(i)) {
+      const extra = existingSections[i]
+      if (extra.questions && extra.questions.length > 0) {
+        syncedSections.push(extra)
+      } else {
+        changed = true
+      }
+    }
+  }
+
+  // Check if length or order changed
+  if (
+    existingSections.length !== syncedSections.length ||
+    existingSections.some((s, idx) => s.sectionId !== syncedSections[idx]?.sectionId)
+  ) {
+    changed = true
+  }
+
+  if (changed) {
+    content.sections = syncedSections
+  }
+
+  return changed
+}
 
 export const paperService = {
   // Get list of all paper drafts/metadata
@@ -123,13 +214,18 @@ export const paperService = {
       mcqOptionLayout: rawLayout.mcqOptionLayout || 'auto',
       pageCountStrategy: rawLayout.pageCountStrategy || 'auto',
       targetPageCount: rawLayout.targetPageCount ?? 2,
-      headerFooter: rawLayout.headerFooter || {
-        logoPlacement: (rawLayout.logoPlacement as any) || 'center',
+      headerFooter: rawLayout.headerFooter ? {
+        ...rawLayout.headerFooter,
+        showRunningFooter: rawLayout.headerFooter.showRunningFooter ?? (rawLayout.footerNote !== '' && rawLayout.headerFooter.footerCustomText !== ''),
+        logoPlacement: rawLayout.showInstituteLogo === false ? 'none' : (rawLayout.headerFooter.logoPlacement || rawLayout.logoPlacement || 'center')
+      } : {
+        logoPlacement: rawLayout.showInstituteLogo === false ? 'none' : ((rawLayout.logoPlacement as any) || 'center'),
         showInstitutionName: true,
         showAddress: true,
         showContact: true,
         headerCustomText: '',
-        footerCustomText: rawLayout.footerNote || 'Omega Education Center — Academic Excellence',
+        showRunningFooter: rawLayout.footerNote !== '',
+        footerCustomText: rawLayout.footerNote !== undefined ? rawLayout.footerNote : 'Omega Education Center — Academic Excellence',
         showPageNumbers: rawLayout.showPageNumbers ?? true,
         pageNumberPosition: rawLayout.pageNumberPosition || 'bottom_center',
         showExamNameInFooter: true,
@@ -137,6 +233,19 @@ export const paperService = {
         borderStyle: 'none',
         differentFirstPage: false,
         firstPageHeaderStyle: 'full'
+      }
+    }
+
+    // Keep content.sections in sync with latest settings.sections
+    if (content && settings && settings.sections && settings.sections.length > 0) {
+      const changed = syncContentSectionsWithSettings(content, settings)
+      if (changed) {
+        content.updatedAt = new Date().toISOString()
+        await db.put('paper_contents', content)
+        if (content.id !== content.paperId) {
+          await db.put('paper_contents', { ...content, id: content.paperId })
+        }
+        await syncQueue.enqueueChange('content', content.id, 'upsert', content)
       }
     }
 
@@ -308,6 +417,7 @@ export const paperService = {
         showAddress: true,
         showContact: true,
         headerCustomText: '',
+        showRunningFooter: true,
         footerCustomText: 'Omega Education Center — Academic Excellence',
         showPageNumbers: true,
         pageNumberPosition: 'bottom_center',
@@ -381,6 +491,28 @@ export const paperService = {
       meta.updatedAt = settings.updatedAt
       await db.put('papers', meta)
       await syncQueue.enqueueChange('paper', meta.id, 'upsert', meta)
+    }
+
+    // Synchronize section titles and instructions in paper_contents
+    let content = meta?.contentId ? await db.get('paper_contents', meta.contentId) : null
+    if (!content) {
+      try {
+        content =
+          (await db.getFromIndex('paper_contents', 'by-paper', settings.paperId)) ||
+          (await db.get('paper_contents', settings.paperId))
+      } catch {}
+    }
+
+    if (content && settings.sections && settings.sections.length > 0) {
+      const changed = syncContentSectionsWithSettings(content, settings)
+      if (changed) {
+        content.updatedAt = settings.updatedAt
+        await db.put('paper_contents', content)
+        if (content.id !== content.paperId) {
+          await db.put('paper_contents', { ...content, id: content.paperId })
+        }
+        await syncQueue.enqueueChange('content', content.id, 'upsert', content)
+      }
     }
 
     await syncQueue.enqueueChange('settings', settings.id, 'upsert', settings)

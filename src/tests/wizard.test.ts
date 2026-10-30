@@ -3,6 +3,7 @@ import 'fake-indexeddb/auto'
 import { validateStep1, validateStep2, validateStep3 } from '../utils/wizardValidation'
 import { calculateMarksFromSections, estimatePageFit } from '../utils/layoutEstimator'
 import { templateService } from '../services/templateService'
+import { paperService } from '../services/paperService'
 import { seedInitialDataIfEmpty } from '../services/db'
 import type { ExamSettings, VisualLayout, ExamSectionConfig } from '../types'
 
@@ -296,5 +297,51 @@ describe('Paper Setup Wizard: Validation & Marks Calculations', () => {
 
     // Clean up tpl1
     await templateService.deleteTemplate(tpl1.id)
+  })
+
+  it('synchronizes content.sections when exam settings section headings are updated', async () => {
+    const paper = await paperService.createNewPaper({
+      title: 'Hindi Exam 2026',
+      subject: 'Hindi',
+      className: 'Class 12',
+      examName: 'Unit Test',
+      totalMarks: 30
+    })
+
+    const initialFull = await paperService.getFullPaper(paper.metadata.id)
+    expect(initialFull).toBeDefined()
+    expect(initialFull!.content.sections[0].title).toContain('Section A')
+
+    // Simulate user editing section title and instructions in Step 2 of Exam Setup
+    const updatedSettings: ExamSettings = {
+      ...initialFull!.settings,
+      sections: initialFull!.settings.sections.map((sec, idx) => {
+        if (idx === 0) {
+          return {
+            ...sec,
+            title: 'खंड-A: वस्तुनिष्ठ प्रश्न (20 MCQ)',
+            instructions: 'वस्तुनिष्ठ प्रश्न किन्हीं दस प्रश्नों के उत्तर दें --'
+          }
+        }
+        if (idx === 1) {
+          return {
+            ...sec,
+            title: 'खंड-B: लघु उत्तरीय प्रश्न (10)',
+            instructions: 'लघु उत्तरीय प्रश्न किन्हीं दस प्रश्नों के उत्तर दें-'
+          }
+        }
+        return sec
+      })
+    }
+
+    await paperService.updateExamSettings(updatedSettings)
+
+    // Retrieve paper and verify content.sections has updated titles and instructions
+    const reloaded = await paperService.getFullPaper(paper.metadata.id)
+    expect(reloaded).toBeDefined()
+    expect(reloaded!.content.sections[0].title).toBe('खंड-A: वस्तुनिष्ठ प्रश्न (20 MCQ)')
+    expect(reloaded!.content.sections[0].instructions).toBe('वस्तुनिष्ठ प्रश्न किन्हीं दस प्रश्नों के उत्तर दें --')
+    expect(reloaded!.content.sections[1].title).toBe('खंड-B: लघु उत्तरीय प्रश्न (10)')
+    expect(reloaded!.content.sections[1].instructions).toBe('लघु उत्तरीय प्रश्न किन्हीं दस प्रश्नों के उत्तर दें-')
   })
 })

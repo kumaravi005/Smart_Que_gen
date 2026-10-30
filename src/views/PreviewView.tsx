@@ -29,7 +29,8 @@ import {
   exportToDocx,
   exportToXlsx,
   generateExportFilename,
-  triggerDownload
+  triggerDownload,
+  triggerPrintWithOrientation
 } from '../utils/exportManager'
 import { paperService } from '../services/paperService'
 import type { ColumnLayout, PageOrientation, FullPaper, SectionContent } from '../types'
@@ -77,7 +78,7 @@ export const PreviewView: React.FC = () => {
   const [downloadingFormat, setDownloadingFormat] = useState<'docx' | 'xlsx' | null>(null)
 
   const handlePrint = () => {
-    window.print()
+    triggerPrintWithOrientation(paper?.layout?.orientation || 'portrait')
   }
 
   const handleDownloadDocx = async () => {
@@ -188,7 +189,7 @@ export const PreviewView: React.FC = () => {
   const currentPage = pages[safePageIndex] || pages[0]
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto pb-24">
+    <div className="space-y-6 max-w-5xl mx-auto pb-24 print:p-0 print:m-0 print:pb-0 print:max-w-none print:w-full print:space-y-0 print-clean-container">
       {/* 3-Step Guided Workflow Stepper (hidden in print) */}
       <div className="print:hidden">
         <WorkflowStepper
@@ -517,7 +518,7 @@ export const PreviewView: React.FC = () => {
       </div>
 
       {/* Dedicated Clean Print Container: Always prints ALL pages at 100% scale without screen margins/zoom */}
-      <div className="hidden print:block w-full">
+      <div className="hidden print:block w-full print:m-0 print:p-0">
         {pages.map((p) => (
           <PaperSheet
             key={`print_page_${p.pageNumber}`}

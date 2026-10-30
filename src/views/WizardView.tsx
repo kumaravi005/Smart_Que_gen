@@ -423,6 +423,7 @@ export const WizardView: React.FC = () => {
         {currentStep === 5 && (
           <Step5HeaderFooter
             layout={localLayout}
+            settings={localSettings}
             onChange={handleLayoutChange}
             errors={stepErrors}
           />

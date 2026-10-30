@@ -585,7 +585,7 @@ export const EditorView: React.FC = () => {
                     : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:border-slate-300'
                 }`}
               >
-                <span>{sec.title.split(':')[0]}</span>
+                <span>{((secConf?.title && secConf.title.trim()) || sec.title).split(':')[0]}</span>
                 <span className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${
                   isSelected
                     ? 'bg-white/20 text-white'
@@ -615,7 +615,7 @@ export const EditorView: React.FC = () => {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <h3 className="font-bold text-slate-900 text-base">
-              Questions in {currentSection?.title?.split(':')[0]}
+              Questions in {((currentSectionConfig?.title && currentSectionConfig.title.trim()) || currentSection?.title || 'Section').split(':')[0]}
             </h3>
             <span className="text-xs text-slate-500 font-medium">
               ({currentSection?.questions?.length || 0} entered)
@@ -645,7 +645,7 @@ export const EditorView: React.FC = () => {
             </div>
             <div>
               <h4 className="text-base font-bold text-slate-800">
-                No questions entered in {currentSection?.title?.split(':')[0]} yet
+                No questions entered in {((currentSectionConfig?.title && currentSectionConfig.title.trim()) || currentSection?.title || 'Section').split(':')[0]} yet
               </h4>
               <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1">
                 Add structured questions one-by-one, paste a block of text via Bulk Input, or import verified items from your Question Bank.

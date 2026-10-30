@@ -63,7 +63,7 @@
     color: #000 !important;
     margin: 0 !important;
     padding: 0 !important;
-    width: 210mm !important;
+    width: 100% !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
@@ -72,11 +72,23 @@
     display: none !important;
   }
 
-  main {
-    padding: 0 !important;
-    margin: 0 !important;
-    max-width: 100% !important;
+  /* Reset outer layout parents to prevent flex fragmentation issues in browser print engine */
+  #root,
+  #root > div,
+  #root > div > div,
+  main,
+  .print-clean-container {
+    display: block !important;
+    position: static !important;
     width: 100% !important;
+    max-width: none !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    overflow: visible !important;
   }
 
   .shadow-xl, .shadow-md, .shadow-xs, .shadow-sm {
@@ -86,18 +98,36 @@
   /* Each A4 sheet is strictly an individual page */
   .paper-sheet {
     width: 210mm !important;
-    min-height: 297mm !important;
-    max-height: 297mm !important;
+    max-width: 210mm !important;
+    min-height: 295mm !important;
+    height: 295mm !important;
+    max-height: 295mm !important;
+    border-radius: 0 !important;
     page-break-after: always !important;
     break-after: page !important;
     page-break-inside: avoid !important;
     break-inside: avoid !important;
     overflow: hidden !important;
     margin: 0 auto !important;
-    border: none !important;
     box-shadow: none !important;
     box-sizing: border-box !important;
     background-color: #fff !important;
+  }
+
+  /* Landscape sheet dimensions */
+  .paper-sheet.is-landscape {
+    width: 297mm !important;
+    max-width: 297mm !important;
+    min-height: 208mm !important;
+    height: 208mm !important;
+    max-height: 208mm !important;
+  }
+
+  /* Prevent question elements from breaking across physical sheets */
+  .break-inside-avoid,
+  .paper-sheet [class*="break-inside-avoid"] {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
   }
 
   /* Prevent blank trailing page */

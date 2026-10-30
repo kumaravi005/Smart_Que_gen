@@ -37,7 +37,12 @@ export function usePaperDetails(paperId?: string) {
     try {
       setSaving(true)
       await paperService.updateExamSettings(settings)
-      setPaper(prev => (prev ? { ...prev, settings } : null))
+      const refreshed = await paperService.getFullPaper(paper.metadata.id)
+      if (refreshed) {
+        setPaper(refreshed)
+      } else {
+        setPaper(prev => (prev ? { ...prev, settings } : null))
+      }
     } finally {
       setSaving(false)
     }

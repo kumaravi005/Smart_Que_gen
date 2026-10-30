@@ -7,12 +7,23 @@ export type NumberingStyle = '123' | 'roman' | 'alpha'
 export type McqOptionLayoutMode = 'auto' | 'four_per_row' | 'two_per_row' | 'one_per_row'
 export type PageCountStrategy = 'auto' | 'prefer_one_page' | 'target_pages' | 'manual'
 
+export type TextAlignment = 'left' | 'center' | 'right'
+
 export interface HeaderFooterSettings {
   logoPlacement: 'left' | 'center' | 'right' | 'none'
+  logoWidthMm?: number
+  logoHeightMm?: number
   showInstitutionName: boolean
+  institutionNameSizePt?: number
+  institutionNameAlign?: TextAlignment
   showAddress: boolean
+  addressSizePt?: number
+  addressAlign?: TextAlignment
+  taglineSizePt?: number
+  taglineAlign?: TextAlignment
   showContact: boolean
   headerCustomText?: string
+  showRunningFooter?: boolean
   footerCustomText?: string
   showPageNumbers: boolean
   pageNumberPosition: 'bottom_center' | 'bottom_right' | 'top_right'
@@ -42,6 +53,7 @@ export interface VisualLayout {
   showInstituteLogo: boolean
   logoPlacement: 'center' | 'left' | 'right' | 'none'
   logoWidthMm: number
+  logoHeightMm?: number
   showWatermark: boolean
   watermarkText?: string
   watermarkOpacity: number // 0.05 to 0.2

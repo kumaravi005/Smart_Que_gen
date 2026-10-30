@@ -336,7 +336,7 @@ export const FormattedMathText: React.FC<FormattedMathTextProps> = ({
   return (
     <Container
       className={`break-words select-text ${
-        isOption ? 'inline-flex items-center flex-wrap gap-x-1 min-h-[36px]' : ''
+        isOption ? 'inline-flex items-baseline flex-wrap gap-x-1' : ''
       } ${className}`}
     >
       {tokens.map((token, idx) => {

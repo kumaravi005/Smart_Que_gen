@@ -59,11 +59,11 @@ export const SectionSummaryBar: React.FC<SectionSummaryBarProps> = ({
               </Badge>
             </div>
             <h2 className="text-base sm:text-lg font-bold text-slate-900 mt-0.5">
-              {currentSection?.title || 'Section'}
+              {(sectionConfig?.title && sectionConfig.title.trim()) || currentSection?.title || 'Section'}
             </h2>
-            {currentSection?.instructions && (
+            {((sectionConfig?.instructions !== undefined ? sectionConfig.instructions : currentSection?.instructions) || '').trim() && (
               <p className="text-xs text-slate-500 italic mt-0.5">
-                {currentSection.instructions}
+                {sectionConfig?.instructions !== undefined ? sectionConfig.instructions : currentSection?.instructions}
               </p>
             )}
           </div>
@@ -111,11 +111,10 @@ export const SectionSummaryBar: React.FC<SectionSummaryBarProps> = ({
           </div>
 
           {/* Total Calculated Marks vs Max Marks */}
-          <div className={`p-3 rounded-2xl border ${
-            isMarksMismatch
-              ? 'bg-amber-50/70 border-amber-300'
-              : 'bg-emerald-50/70 border-emerald-300'
-          }`}>
+          <div className={`p-3 rounded-2xl border ${isMarksMismatch
+            ? 'bg-amber-50/70 border-amber-300'
+            : 'bg-emerald-50/70 border-emerald-300'
+            }`}>
             <span className={`block mb-0.5 ${isMarksMismatch ? 'text-amber-800' : 'text-emerald-800'}`}>
               Total Paper Marks:
             </span>

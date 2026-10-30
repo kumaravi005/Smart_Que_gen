@@ -4,7 +4,8 @@ import type {
   VisualLayout,
   Question,
   PageSize,
-  PageOrientation
+  PageOrientation,
+  McqOptionLayoutMode
 } from '../types'
 import type {
   GeneratedPage,
@@ -58,52 +59,68 @@ export function estimateQuestionHeightMm(
   isTwoColumn: boolean,
   fontSizePt: number = 11,
   lineSpacing: number = 1.25,
-  questionSpacingPt: number = 10
+  questionSpacingPt: number = 10,
+  optionsLayoutMode: McqOptionLayoutMode = 'auto',
+  optionSpacingPt: number = 3
 ): number {
-  // In 2-column mode, column width is ~85mm (fits ~32-34 chars at 11pt, including Devanagari/Hindi)
-  // In single-column mode, column width is ~170mm (fits ~68-72 chars at 11pt)
-  const charsPerLine = isTwoColumn ? 32 : 68
-  const promptLines = Math.max(1, Math.ceil((q.prompt || '').trim().length / charsPerLine))
+  // In 2-column mode, column width is ~85mm (fits ~42-45 chars at 11pt, including Devanagari/Hindi)
+  // In single-column mode, column width is ~170mm-190mm (fits ~90-100 chars at 11pt)
+  const charsPerLine = isTwoColumn ? 44 : 92
+  const cleanPrompt = (q.prompt || '').trim()
+  const promptLines = Math.max(1, Math.ceil(cleanPrompt.length / charsPerLine))
   const lineSpacingFactor = Math.max(1, lineSpacing) / 1.15
   const fontFactor = fontSizePt / 11
+  const optSpacingMm = (optionSpacingPt || 3) * 0.3527
 
-  let height = promptLines * 5.0 * lineSpacingFactor * fontFactor
+  // 1 prompt line in Hindi/English with marks and Q number is ~3.8mm at standard 11pt
+  let height = promptLines * 3.8 * lineSpacingFactor * fontFactor
 
   // Specific instructions
   if (q.instructions) {
-    height += 6
+    height += 3.5
   }
 
   // Diagram / Image
   if (q.diagramUrl) {
-    height += 46
+    height += 40
   }
 
   // MCQ Options
   if (q.options && q.options.length > 0) {
     const estimation = estimateMcqOptionGrid({
       options: q.options,
-      mode: q.customLayoutMode || 'auto',
+      mode: q.customLayoutMode || optionsLayoutMode || 'auto',
       columnLayout: isTwoColumn ? 'two_column' : 'single'
     })
 
     if (estimation.resolvedGridCols === 4) {
-      height += 8
+      height += Math.max(4.0, 3.6 * fontFactor * lineSpacingFactor) + optSpacingMm * 0.3
     } else if (estimation.resolvedGridCols === 2) {
       const rows = Math.ceil(q.options.length / 2)
-      height += rows * 7.5
+      // Check if any option wraps to 2 lines
+      const maxOptLen = Math.max(...q.options.map(o => (o.text || '').trim().length), 0)
+      const hasWrap = maxOptLen > (isTwoColumn ? 24 : 48)
+      const effectiveRows = rows + (hasWrap ? 0.7 : 0)
+      height += effectiveRows * (3.5 * fontFactor * lineSpacingFactor) + (rows - 1) * optSpacingMm + optSpacingMm * 0.3
     } else {
-      height += q.options.length * 7.0
+      // Stacked vertically: account for long option wrapping
+      let optHeight = 0
+      for (const opt of q.options) {
+        const optLines = Math.max(1, Math.ceil((opt.text || '').trim().length / (isTwoColumn ? 38 : 78)))
+        optHeight += optLines * (3.3 * fontFactor * lineSpacingFactor)
+      }
+      height += Math.max(q.options.length * 3.3 * fontFactor * lineSpacingFactor, optHeight) + (q.options.length - 1) * optSpacingMm + optSpacingMm * 0.3
     }
   }
 
   // Subjective Ruled Lines
   if (q.writingSpaceLines && q.writingSpaceLines > 0) {
-    height += q.writingSpaceLines * 5.5
+    height += q.writingSpaceLines * 4.8
   }
 
-  // Spacing and borders
-  height += Math.max(3.5, questionSpacingPt * 0.38)
+  // Spacing between questions (already reflects user's questionSpacingPt slider)
+  const qSpacingMm = (questionSpacingPt || 8) * 0.3527
+  height += Math.max(1.2, qSpacingMm * 0.4)
 
   return Math.round(height * 10) / 10
 }
@@ -126,9 +143,22 @@ export function paginatePaper({
 
   const margins = layout.pageMarginsMm || { top: 15, bottom: 15, left: 15, right: 15 }
   const usablePageHeight = dimensions.height - margins.top - margins.bottom
-  const footerHeight = 16
-  const safetyBuffer = 14 // 14mm safety buffer so content never overflows browser printable A4 boundary
-  const netUsableHeight = Math.max(100, usablePageHeight - footerHeight - safetyBuffer)
+
+  const rawFooterText =
+    (layout.headerFooter?.footerCustomText !== undefined
+      ? layout.headerFooter.footerCustomText
+      : layout.footerNote) || ''
+  const showRunningFooter =
+    layout.headerFooter?.showRunningFooter !== false && rawFooterText.trim().length > 0
+  const showExamName = Boolean(layout.headerFooter?.showExamNameInFooter)
+  const showPageNumbers =
+    layout.headerFooter?.showPageNumbers !== false && layout.showPageNumbers !== false
+  const hasFooter = showRunningFooter || showExamName || showPageNumbers
+  const footerHeight = hasFooter ? 16 : 0
+
+  const safetyBuffer = 3.5 // Margin buffer to prevent content from touching the footer boundary
+  const physicalAvailableHeight = Math.max(100, usablePageHeight - footerHeight)
+  const targetUsableHeight = Math.max(90, physicalAvailableHeight - safetyBuffer)
 
   const pages: GeneratedPage[] = []
 
@@ -138,7 +168,7 @@ export function paginatePaper({
       isCoverPage: isCover,
       elements: [],
       usedHeightMm: 0,
-      availableHeightMm: isCover ? usablePageHeight : netUsableHeight,
+      availableHeightMm: isCover ? usablePageHeight : physicalAvailableHeight,
       hasTwoColumns: isTwoColumn && !isCover,
       columnLayout: isTwoColumn && !isCover ? 'two_column' : 'single'
     }
@@ -166,7 +196,55 @@ export function paginatePaper({
   const isFirstContentPage = pages.length === (settings.coverPageMode === 'separate_cover' ? 1 : 0)
   if (isFirstContentPage) {
     // Header
-    const fullHeaderHeight = settings.institute.logoUrl && layout.logoPlacement !== 'none' ? 44 : 36
+    const showLogo =
+      layout.showInstituteLogo !== false &&
+      layout.logoPlacement !== 'none' &&
+      layout.headerFooter?.logoPlacement !== 'none'
+    const logoSizeMm = layout.headerFooter?.logoWidthMm || layout.logoWidthMm || 24
+    const instNamePt = layout.headerFooter?.institutionNameSizePt || 22
+    const taglinePt = layout.headerFooter?.taglineSizePt || 11
+    const addressPt = layout.headerFooter?.addressSizePt || 9.5
+
+    // Base header: exam title & parameters bar (Subject, Class, Time, Marks) is ~12mm
+    let textHeaderHeight = 12
+    if (layout.headerFooter?.showInstitutionName !== false) {
+      textHeaderHeight += (instNamePt * 0.3527 * 1.1)
+    }
+    if (settings.institute.tagline) {
+      textHeaderHeight += (taglinePt * 0.3527 * 1.15 + 1)
+    }
+    if (layout.headerFooter?.showAddress !== false && settings.institute.address) {
+      textHeaderHeight += (addressPt * 0.3527 * 1.15 + 1)
+    }
+    if (layout.headerFooter?.showContact && settings.institute.contact) {
+      textHeaderHeight += (addressPt * 0.3527 * 1.1 + 1)
+    }
+
+    let fullHeaderHeight = textHeaderHeight
+    if (showLogo && settings.institute.logoUrl) {
+      const explicitLogoHeight = layout.headerFooter?.logoHeightMm || layout.logoHeightMm
+      let effectiveLogoHeight: number
+      if (explicitLogoHeight) {
+        effectiveLogoHeight = explicitLogoHeight
+      } else if (logoSizeMm <= 40) {
+        effectiveLogoHeight = logoSizeMm * 0.5
+      } else {
+        effectiveLogoHeight = Math.min(32, Math.max(14, Math.round(14 + (logoSizeMm - 40) * 0.22)))
+      }
+
+      const isSideLogo =
+        layout.headerFooter?.logoPlacement === 'left' ||
+        layout.headerFooter?.logoPlacement === 'right' ||
+        layout.logoPlacement === 'left' ||
+        layout.logoPlacement === 'right'
+
+      if (isSideLogo) {
+        fullHeaderHeight = Math.max(textHeaderHeight, effectiveLogoHeight + 12)
+      } else {
+        fullHeaderHeight = textHeaderHeight + effectiveLogoHeight + 2
+      }
+    }
+    fullHeaderHeight = Math.ceil(Math.max(24, fullHeaderHeight))
     const headerEl: HeaderPageElement = {
       id: generateId('hdr'),
       type: 'header',
@@ -184,7 +262,7 @@ export function paginatePaper({
       const candEl: CandidateBlockElement = {
         id: generateId('cand'),
         type: 'candidate_block',
-        heightMm: 14,
+        heightMm: 11,
         showName: sf.showName,
         showRollNo: sf.showRollNo,
         showSection: sf.showSection,
@@ -192,12 +270,12 @@ export function paginatePaper({
         examDate: settings.date
       }
       currentPage.elements.push(candEl)
-      currentPage.usedHeightMm += 14
+      currentPage.usedHeightMm += (11 + 2.0)
     }
 
     // General Instructions Block (if not separate cover)
     if (settings.coverPageMode !== 'separate_cover' && settings.generalInstructions && settings.generalInstructions.length > 0) {
-      const instHeight = Math.min(32, 8 + settings.generalInstructions.length * 3.6)
+      const instHeight = Math.min(26, 7 + settings.generalInstructions.length * 3.2)
       const instEl: InstructionsPageElement = {
         id: generateId('inst'),
         type: 'instructions',
@@ -205,7 +283,7 @@ export function paginatePaper({
         instructions: settings.generalInstructions
       }
       currentPage.elements.push(instEl)
-      currentPage.usedHeightMm += instHeight
+      currentPage.usedHeightMm += (instHeight + 2.0)
     }
   }
 
@@ -232,13 +310,38 @@ export function paginatePaper({
   }
 
   // 3. Process Sections and Questions
-  const allSections = content.sections || []
+  const contentSecs = [...(content.sections || [])]
+  const settingSecs = settings.sections || []
+
+  // Ensure any section configured in settings is represented
+  for (const sConf of settingSecs) {
+    if (!contentSecs.some(s => s.sectionId === sConf.id)) {
+      contentSecs.push({
+        sectionId: sConf.id,
+        title: sConf.title,
+        instructions: sConf.instructions,
+        questions: []
+      })
+    }
+  }
+
+  // Filter out explicitly disabled sections, and prune empty dummy sections if there are other populated sections
+  const allSections = contentSecs.filter(sec => {
+    const secConfig = settingSecs.find(s => s.id === sec.sectionId)
+    if (secConfig && secConfig.enabled === false) return false
+    return (sec.questions && sec.questions.length > 0) || contentSecs.length === 1
+  })
+
+  const totalExamQuestions = allSections.reduce((acc, s) => acc + (s.questions?.length || 0), 0)
   let globalQuestionIndex = 0
 
   for (let sIdx = 0; sIdx < allSections.length; sIdx++) {
     const sec = allSections[sIdx]
-    const secConfig = settings.sections.find(s => s.id === sec.sectionId)
+    const secConfig = settingSecs.find(s => s.id === sec.sectionId)
     const questions = sec.questions || []
+
+    const sectionTitle = (secConfig?.title && secConfig.title.trim()) || sec.title
+    const sectionInstructions = secConfig?.instructions !== undefined ? secConfig.instructions : sec.instructions
 
     // Check Section-Break-New-Page option
     const shouldStartOnNewPage =
@@ -249,14 +352,15 @@ export function paginatePaper({
       pushAndStartNewPage()
     }
 
-    // Section Header Element
-    const sectionHeaderHeight = sec.instructions ? 16 : 11
+    // Section Header Element (compact height reflecting true DOM render)
+    const hasInstructions = Boolean(sectionInstructions && sectionInstructions.trim())
+    const sectionHeaderHeight = hasInstructions ? 9.5 : 6.5
     const sectionHeaderEl: SectionHeaderPageElement = {
       id: generateId('sec'),
       type: 'section_header',
       sectionId: sec.sectionId,
-      title: sec.title,
-      instructions: sec.instructions,
+      title: sectionTitle,
+      instructions: sectionInstructions,
       numberingStyle: secConfig?.numberingStyle || 'continuous',
       heightMm: sectionHeaderHeight
     }
@@ -265,13 +369,14 @@ export function paginatePaper({
     pendingCol0Height = 0
 
     // Orphan Section Header Prevention:
-    // Ensure section header and at least the first question or 25mm can fit
+    // Ensure section header and at least the first question or 14mm can fit
     const firstQHeight = questions.length > 0
-      ? estimateQuestionHeightMm(questions[0], isTwoColumn, layout.fontSizePt, layout.lineSpacing, layout.questionSpacingPt)
-      : 20
+      ? estimateQuestionHeightMm(questions[0], isTwoColumn, layout.fontSizePt, layout.lineSpacing, layout.questionSpacingPt, layout.mcqOptionLayout, layout.optionSpacingPt)
+      : 12
 
-    const remainingHeight = currentPage.availableHeightMm - currentPage.usedHeightMm
-    if (remainingHeight < (sectionHeaderHeight + firstQHeight) && currentPage.elements.some(e => e.type === 'question')) {
+    const remainingHeight = targetUsableHeight - currentPage.usedHeightMm
+    const minRequired = sectionHeaderHeight + Math.min(14, firstQHeight)
+    if (remainingHeight < minRequired && currentPage.elements.some(e => e.type === 'question')) {
       pushAndStartNewPage()
     }
 
@@ -286,7 +391,9 @@ export function paginatePaper({
         isTwoColumn,
         layout.fontSizePt,
         layout.lineSpacing,
-        layout.questionSpacingPt
+        layout.questionSpacingPt,
+        layout.mcqOptionLayout,
+        layout.optionSpacingPt
       )
 
       const displayNumber = getDisplayQuestionNumber({
@@ -298,12 +405,25 @@ export function paginatePaper({
       })
       globalQuestionIndex++
 
+      // Elasticity calculation:
+      // When near the end of the paper (<=3 questions remaining), allow up to 3.0mm elasticity
+      // into the margin safety buffer to avoid stranding 1-2 questions on a nearly blank page.
+      // Standard elasticity is 1.5mm to absorb minor DOM line variances.
+      const remainingQuestionsInPaper = totalExamQuestions - globalQuestionIndex
+      const elasticityMm = remainingQuestionsInPaper <= 3 ? 3.0 : 1.5
+
       // Two-column row tracking vs Single-column tracking
       if (isTwoColumn) {
         if (pendingCol0Height === 0) {
-          // Starting Col 0 (left column): check if this new row fits on current page
-          const remaining = currentPage.availableHeightMm - currentPage.usedHeightMm
-          if (qHeight > remaining && currentPage.elements.some(e => e.type === 'question')) {
+          // Starting Col 0 (left column): check if full dual-column row fits on current page
+          const nextQ = qIdx + 1 < questions.length ? questions[qIdx + 1] : undefined
+          const nextQHeight = nextQ
+            ? estimateQuestionHeightMm(nextQ, isTwoColumn, layout.fontSizePt, layout.lineSpacing, layout.questionSpacingPt, layout.mcqOptionLayout, layout.optionSpacingPt)
+            : 0
+          const expectedRowHeight = Math.max(qHeight, nextQHeight)
+
+          const remaining = targetUsableHeight - currentPage.usedHeightMm
+          if (expectedRowHeight > (remaining + elasticityMm) && currentPage.elements.some(e => e.type === 'question')) {
             pushAndStartNewPage()
           }
           pendingCol0Height = qHeight
@@ -316,8 +436,8 @@ export function paginatePaper({
         }
       } else {
         // Single column: check if question fits on current page
-        const remaining = currentPage.availableHeightMm - currentPage.usedHeightMm
-        if (qHeight > remaining && currentPage.elements.some(e => e.type === 'question')) {
+        const remaining = targetUsableHeight - currentPage.usedHeightMm
+        if (qHeight > (remaining + elasticityMm) && currentPage.elements.some(e => e.type === 'question')) {
           pushAndStartNewPage()
         }
         currentPage.usedHeightMm += qHeight

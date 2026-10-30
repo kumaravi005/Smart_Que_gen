@@ -17,6 +17,8 @@ export const LayoutEngineView: React.FC = () => {
   const [columnLayout, setColumnLayout] = useState<'single' | 'two_column'>('single')
   const [fontSizePt, setFontSizePt] = useState(11)
   const [lineSpacing, setLineSpacing] = useState(1.25)
+  const [questionSpacingPt, setQuestionSpacingPt] = useState(8)
+  const [optionSpacingPt, setOptionSpacingPt] = useState(3)
   const [dividerBetweenQuestions, setDivider] = useState(true)
   const [saved, setSaved] = useState(false)
 
@@ -25,6 +27,8 @@ export const LayoutEngineView: React.FC = () => {
       setColumnLayout(paper.layout.columnLayout === 'two_column' ? 'two_column' : 'single')
       setFontSizePt(paper.layout.fontSizePt || 11)
       setLineSpacing(paper.layout.lineSpacing || 1.25)
+      setQuestionSpacingPt(paper.layout.questionSpacingPt ?? 8)
+      setOptionSpacingPt(paper.layout.optionSpacingPt ?? 3)
       setDivider(paper.layout.dividerBetweenQuestions ?? true)
     }
   }, [paper])
@@ -36,6 +40,8 @@ export const LayoutEngineView: React.FC = () => {
       columnLayout,
       fontSizePt,
       lineSpacing,
+      questionSpacingPt,
+      optionSpacingPt,
       dividerBetweenQuestions
     })
     setSaved(true)
@@ -163,6 +169,46 @@ export const LayoutEngineView: React.FC = () => {
               <span>1.0x (Tight)</span>
               <span>1.25x (Recommended)</span>
               <span>1.75x (Spaced)</span>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">
+              Question Spacing: {questionSpacingPt}pt
+            </label>
+            <input
+              type="range"
+              min="2"
+              max="20"
+              step="1"
+              value={questionSpacingPt}
+              onChange={e => setQuestionSpacingPt(Number(e.target.value))}
+              className="w-full accent-purple-600"
+            />
+            <div className="flex justify-between text-[10px] text-slate-400 mt-1">
+              <span>2pt (Compact)</span>
+              <span>8pt (Default)</span>
+              <span>20pt (Wide)</span>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">
+              Option Spacing: {optionSpacingPt}pt
+            </label>
+            <input
+              type="range"
+              min="1"
+              max="12"
+              step="1"
+              value={optionSpacingPt}
+              onChange={e => setOptionSpacingPt(Number(e.target.value))}
+              className="w-full accent-purple-600"
+            />
+            <div className="flex justify-between text-[10px] text-slate-400 mt-1">
+              <span>1pt (Tight)</span>
+              <span>3pt (Compact)</span>
+              <span>12pt (Wide)</span>
             </div>
           </div>
         </div>

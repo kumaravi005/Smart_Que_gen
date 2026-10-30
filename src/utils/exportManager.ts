@@ -394,10 +394,15 @@ export async function exportToDocx(paper: FullPaper): Promise<Blob> {
   let globalIndex = 1
 
   for (const sec of sections) {
+    const secConfig = settings.sections?.find(s => s.id === sec.sectionId)
+    if (secConfig && secConfig.enabled === false) continue
+
     const secQuestions = sec.questions || []
     if (secQuestions.length === 0) continue
 
     const secMarks = secQuestions.reduce((acc, q) => acc + (q.marks || 0), 0)
+    const secTitle = (secConfig?.title && secConfig.title.trim()) || sec.title
+    const secInstructions = secConfig?.instructions !== undefined ? secConfig.instructions : sec.instructions
 
     // Section Heading
     docChildren.push(
@@ -405,7 +410,7 @@ export async function exportToDocx(paper: FullPaper): Promise<Blob> {
         heading: HeadingLevel.HEADING_2,
         children: [
           new TextRun({
-            text: `${sec.title.toUpperCase()} ${secMarks > 0 ? `(${secMarks} Marks)` : ''}`,
+            text: `${secTitle.toUpperCase()} ${secMarks > 0 ? `(${secMarks} Marks)` : ''}`,
             bold: true,
             size: 24, // 12pt
             font: 'Times New Roman'
@@ -416,12 +421,15 @@ export async function exportToDocx(paper: FullPaper): Promise<Blob> {
       })
     )
 
-    if (sec.instructions) {
+    if (secInstructions && secInstructions.trim()) {
+      const formattedInst = secInstructions.trim().startsWith('(') && secInstructions.trim().endsWith(')')
+        ? secInstructions.trim()
+        : `(${secInstructions.trim()})`
       docChildren.push(
         new Paragraph({
           children: [
             new TextRun({
-              text: `(${sec.instructions})`,
+              text: formattedInst,
               italics: true,
               size: 20,
               font: 'Times New Roman',
@@ -628,6 +636,10 @@ export function exportToXlsx(paper: FullPaper): Blob {
   let globalIndex = 1
 
   for (const sec of sections) {
+    const secConfig = settings.sections?.find(s => s.id === sec.sectionId)
+    if (secConfig && secConfig.enabled === false) continue
+    const secTitle = (secConfig?.title && secConfig.title.trim()) || sec.title
+
     for (const q of sec.questions || []) {
       const qNum = q.customNumber ? q.customNumber : globalIndex++
       const optA = q.options?.find(o => o.label === 'A')?.text || ''
@@ -639,7 +651,7 @@ export function exportToXlsx(paper: FullPaper): Blob {
 
       rows.push([
         qNum,
-        sec.title,
+        secTitle,
         q.type.replace(/_/g, ' ').toUpperCase(),
         q.prompt,
         optA,

@@ -63,19 +63,20 @@ export function estimateMcqOptionGrid({
 
   // Automatic intelligent adaptation
   if (isTwoColumnPaper) {
-    // Two-column paper has narrower width (~80mm per column)
-    if (options.length === 4 && maxOptionLength <= 10) {
+    // Two-column paper has narrower width (~85mm per column)
+    // Up to 42 characters fit comfortably across 2 columns of options (42mm each, wrapping cleanly if needed)
+    if (options.length === 4 && maxOptionLength <= 42) {
       return {
         resolvedGridCols: 2,
         gridClass: 'grid-cols-2',
-        reason: 'Auto: Short options fit dual columns in 2-column layout',
+        reason: 'Auto: Options up to 42 chars fit dual columns in 2-column layout',
         maxOptionLength
       }
     }
     return {
       resolvedGridCols: 1,
       gridClass: 'grid-cols-1',
-      reason: 'Auto: Stacked vertically for readable 2-column layout',
+      reason: 'Auto: Stacked vertically for long descriptive choices',
       maxOptionLength
     }
   }
