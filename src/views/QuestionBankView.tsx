@@ -137,6 +137,17 @@ export const QuestionBankView: React.FC = () => {
   const currentSubfolders = folders.filter(f => f.parentId === currentFolderId)
   const currentFolder = folders.find(f => f.id === currentFolderId)
 
+  // Full folder breadcrumb path helper
+  const getFolderPath = (folderId: string): string => {
+    const path: string[] = []
+    let curr: BankFolder | undefined = folders.find(f => f.id === folderId)
+    while (curr) {
+      path.unshift(curr.name)
+      curr = curr.parentId ? folders.find(f => f.id === curr!.parentId) : undefined
+    }
+    return path.join(' / ')
+  }
+
   // Handle Folder Creation or Update
   const handleSaveFolder = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -309,27 +320,47 @@ export const QuestionBankView: React.FC = () => {
   // Move Questions
   const handleConfirmMove = async () => {
     if (selectedQuestionIds.size === 0) return
-    await bankService.moveQuestions(Array.from(selectedQuestionIds), targetMoveFolderId)
-    setIsMoveModalOpen(false)
-    setSelectedQuestionIds(new Set())
-    await loadData()
+    if (targetMoveFolderId === currentFolderId) {
+      alert('Selected questions are already in this folder. Please choose a different destination folder.')
+      return
+    }
+    try {
+      await bankService.moveQuestions(Array.from(selectedQuestionIds), targetMoveFolderId)
+      setIsMoveModalOpen(false)
+      setSelectedQuestionIds(new Set())
+      await loadData()
+    } catch (err) {
+      console.error('Error moving questions:', err)
+      alert('Failed to move questions. Please try again.')
+    }
   }
 
   // Delete Single Question
   const handleDeleteQuestion = async (id: string) => {
     if (window.confirm('Delete this question from bank?')) {
-      await bankService.deleteQuestion(id)
-      await loadData()
+      try {
+        await bankService.deleteQuestion(id)
+        await loadData()
+      } catch (err) {
+        console.error('Error deleting question:', err)
+        alert('Failed to delete question. Please try again.')
+      }
     }
   }
 
   // Delete Selected Questions
   const handleDeleteSelected = async () => {
     if (selectedQuestionIds.size === 0) return
-    if (window.confirm(`Delete ${selectedQuestionIds.size} selected questions?`)) {
-      await bankService.deleteQuestionsBulk(Array.from(selectedQuestionIds))
-      setSelectedQuestionIds(new Set())
-      await loadData()
+    const count = selectedQuestionIds.size
+    if (window.confirm(`Delete ${count} selected questions? This cannot be undone.`)) {
+      try {
+        await bankService.deleteQuestionsBulk(Array.from(selectedQuestionIds))
+        setSelectedQuestionIds(new Set())
+        await loadData()
+      } catch (err) {
+        console.error('Error deleting questions:', err)
+        alert('Failed to delete questions. Please try again.')
+      }
     }
   }
 
@@ -716,7 +747,8 @@ export const QuestionBankView: React.FC = () => {
               size="sm"
               leftIcon={<MoveRight className="w-3.5 h-3.5" />}
               onClick={() => {
-                setTargetMoveFolderId(currentFolderId)
+                const otherFolder = folders.find(f => f.id !== currentFolderId)
+                setTargetMoveFolderId(currentFolderId === null ? (otherFolder?.id || null) : null)
                 setIsMoveModalOpen(true)
               }}
             >
@@ -1604,32 +1636,56 @@ Ans: C`)
           <div className="space-y-1.5 max-h-60 overflow-y-auto">
             <button
               type="button"
+              disabled={currentFolderId === null}
               onClick={() => setTargetMoveFolderId(null)}
-              className={`w-full text-left p-2.5 rounded-xl border text-xs flex items-center gap-2 transition-colors ${
-                targetMoveFolderId === null
+              className={`w-full text-left p-2.5 rounded-xl border text-xs flex items-center justify-between transition-colors ${
+                currentFolderId === null
+                  ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed opacity-60'
+                  : targetMoveFolderId === null
                   ? 'bg-emerald-50 border-emerald-300 text-emerald-900 font-bold'
                   : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
               }`}
             >
-              <FolderTree className="w-4 h-4 text-emerald-600" />
-              <span>Root (Unfiled Questions)</span>
+              <div className="flex items-center gap-2">
+                <FolderTree className="w-4 h-4 text-emerald-600" />
+                <span>Root (Unfiled Questions)</span>
+              </div>
+              {currentFolderId === null && (
+                <span className="text-[10px] bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded font-semibold">
+                  Current
+                </span>
+              )}
             </button>
 
-            {folders.map(f => (
-              <button
-                key={f.id}
-                type="button"
-                onClick={() => setTargetMoveFolderId(f.id)}
-                className={`w-full text-left p-2.5 rounded-xl border text-xs flex items-center gap-2 transition-colors ${
-                  targetMoveFolderId === f.id
-                    ? 'bg-emerald-50 border-emerald-300 text-emerald-900 font-bold'
-                    : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
-                }`}
-              >
-                <Folder className="w-4 h-4 text-emerald-600" />
-                <span>{f.name}</span>
-              </button>
-            ))}
+            {folders.map(f => {
+              const isCurrent = f.id === currentFolderId
+              const folderPath = getFolderPath(f.id)
+              return (
+                <button
+                  key={f.id}
+                  type="button"
+                  disabled={isCurrent}
+                  onClick={() => setTargetMoveFolderId(f.id)}
+                  className={`w-full text-left p-2.5 rounded-xl border text-xs flex items-center justify-between transition-colors ${
+                    isCurrent
+                      ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed opacity-60'
+                      : targetMoveFolderId === f.id
+                      ? 'bg-emerald-50 border-emerald-300 text-emerald-900 font-bold'
+                      : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                  }`}
+                >
+                  <div className="flex items-center gap-2 truncate">
+                    <Folder className={`w-4 h-4 shrink-0 ${isCurrent ? 'text-slate-400' : 'text-emerald-600'}`} />
+                    <span className="truncate">{folderPath}</span>
+                  </div>
+                  {isCurrent && (
+                    <span className="text-[10px] bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded font-semibold shrink-0">
+                      Current
+                    </span>
+                  )}
+                </button>
+              )
+            })}
           </div>
 
           <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">

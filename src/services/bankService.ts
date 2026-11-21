@@ -259,21 +259,31 @@ export const bankService = {
 
     // Handle questions in deleted folders
     const allQuestions = await db.getAll('question_bank')
+    const questionsToSyncDelete: string[] = []
+    const questionsToSyncUpdate: QuestionBankItem[] = []
+
     const txQ = db.transaction('question_bank', 'readwrite')
     for (const q of allQuestions) {
       if (q.folderId && folderIdsToDelete.includes(q.folderId)) {
         if (deleteContents) {
           await txQ.store.delete(q.id)
-          syncQueue.enqueueChange('question', q.id, 'delete').catch(() => {})
+          questionsToSyncDelete.push(q.id)
         } else {
           // Unlink to root
           const unlinked = { ...q, folderId: null, updatedAt: new Date().toISOString() }
           await txQ.store.put(unlinked)
-          syncQueue.enqueueChange('question', q.id, 'upsert', unlinked).catch(() => {})
+          questionsToSyncUpdate.push(unlinked)
         }
       }
     }
     await txQ.done
+
+    for (const qId of questionsToSyncDelete) {
+      syncQueue.enqueueChange('question', qId, 'delete').catch(() => {})
+    }
+    for (const unlinked of questionsToSyncUpdate) {
+      syncQueue.enqueueChange('question', unlinked.id, 'upsert', unlinked).catch(() => {})
+    }
 
     for (const fId of folderIdsToDelete) {
       await syncQueue.enqueueChange('folder', fId, 'delete')
@@ -486,18 +496,36 @@ export const bankService = {
 
   // Move questions to another folder
   async moveQuestions(questionIds: string[], targetFolderId: string | null): Promise<void> {
+    if (questionIds.length === 0) return
     const db = await getDatabase()
+    const updatedItems: QuestionBankItem[] = []
+    const now = new Date().toISOString()
+
     const tx = db.transaction('question_bank', 'readwrite')
     for (const qId of questionIds) {
       const item = await tx.store.get(qId)
       if (item) {
         item.folderId = targetFolderId
-        item.updatedAt = new Date().toISOString()
+        item.updatedAt = now
         await tx.store.put(item)
-        await syncQueue.enqueueChange('question', item.id, 'upsert', item)
+        updatedItems.push(item)
       }
     }
     await tx.done
+
+    // Enqueue sync mutations outside the question_bank transaction to keep IDB transaction active
+    for (const item of updatedItems) {
+      await syncQueue.enqueueChange('question', item.id, 'upsert', item)
+    }
+
+    if (supabase && isSupabaseConfigured && updatedItems.length > 0) {
+      supabase
+        .from('question_bank')
+        .update({ folder_id: targetFolderId, updated_at: now })
+        .in('id', updatedItems.map(i => i.id))
+        .then(() => {}, () => {})
+    }
+
     syncService.triggerDebouncedSync()
   },
 
@@ -532,20 +560,28 @@ export const bankService = {
 
   // Delete multiple questions in bulk
   async deleteQuestionsBulk(ids: string[]): Promise<boolean> {
+    if (ids.length === 0) return true
     const db = await getDatabase()
+
     const tx = db.transaction('question_bank', 'readwrite')
     for (const id of ids) {
       await tx.store.delete(id)
-      await syncQueue.enqueueChange('question', id, 'delete')
     }
     await tx.done
-    if (supabase && isSupabaseConfigured) {
+
+    // Enqueue sync mutations outside the question_bank transaction to keep IDB transaction active
+    for (const id of ids) {
+      await syncQueue.enqueueChange('question', id, 'delete')
+    }
+
+    if (supabase && isSupabaseConfigured && ids.length > 0) {
       supabase
         .from('question_bank')
         .delete()
         .in('id', ids)
         .then(() => {}, () => {})
     }
+
     syncService.triggerDebouncedSync()
     return true
   }

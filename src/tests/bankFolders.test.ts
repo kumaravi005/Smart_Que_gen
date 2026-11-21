@@ -369,4 +369,71 @@ Ans: A`
     expect(parsed[2].prompt).toBe('मनुष्य की बातचीत का उत्तम तरीका क्या है?')
     expect(parsed[2].options?.length).toBe(4)
   })
+
+  it('bulk moves multiple questions to a target folder atomically without transaction errors', async () => {
+    const folderA = await bankService.createFolder({ name: 'Source Chapter', color: 'blue' })
+    const folderB = await bankService.createFolder({ name: 'Target Chapter', color: 'emerald' })
+
+    const qIds: string[] = []
+    for (let i = 1; i <= 5; i++) {
+      const q = await bankService.addQuestion({
+        prompt: `Question ${i} in Chapter A`,
+        type: 'mcq',
+        marks: 1,
+        difficulty: 'easy',
+        subject: 'Hindi',
+        className: 'Class 12th',
+        topic: 'Source Chapter',
+        folderId: folderA.id,
+        tags: ['Hindi']
+      })
+      qIds.push(q.id)
+    }
+
+    // Verify folder A has 5 questions
+    const beforeA = await bankService.getQuestions({ folderId: folderA.id })
+    expect(beforeA.length).toBe(5)
+
+    // Move all 5 questions to folder B
+    await bankService.moveQuestions(qIds, folderB.id)
+
+    // Verify folder A now has 0 questions
+    const afterA = await bankService.getQuestions({ folderId: folderA.id })
+    expect(afterA.length).toBe(0)
+
+    // Verify folder B now has all 5 questions
+    const afterB = await bankService.getQuestions({ folderId: folderB.id })
+    expect(afterB.length).toBe(5)
+    expect(afterB.map(q => q.id).sort()).toEqual(qIds.sort())
+  })
+
+  it('bulk deletes multiple selected questions atomically without transaction errors', async () => {
+    const folder = await bankService.createFolder({ name: 'Delete Chapter Test', color: 'amber' })
+    const qIds: string[] = []
+    for (let i = 1; i <= 5; i++) {
+      const q = await bankService.addQuestion({
+        prompt: `Question to be deleted ${i}`,
+        type: 'mcq',
+        marks: 1,
+        difficulty: 'easy',
+        subject: 'Hindi',
+        className: 'Class 12th',
+        topic: 'Delete Test',
+        folderId: folder.id,
+        tags: ['Test']
+      })
+      qIds.push(q.id)
+    }
+
+    const before = await bankService.getQuestions({ folderId: folder.id })
+    expect(before.length).toBe(5)
+
+    // Bulk delete all 5 questions
+    const success = await bankService.deleteQuestionsBulk(qIds)
+    expect(success).toBe(true)
+
+    // Verify folder now has 0 questions
+    const after = await bankService.getQuestions({ folderId: folder.id })
+    expect(after.length).toBe(0)
+  })
 })
