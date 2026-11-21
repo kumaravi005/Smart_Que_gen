@@ -93,6 +93,29 @@ Important note at bottom of exam sheet.
     expect(result.unrecognizedText.some(line => line.includes('Important note'))).toBe(true)
   })
 
+  it('parses bulk unnumbered MCQs with inline options and marks matching options in editor', () => {
+    const rawText = `
+निबंध लेखन की दृष्टि से भारतेन्दु युग कैसा था?
+(A) उर्वर (B) अनुपयोगी (C) प्रगतिशील (D) प्रतिगामी
+Ans: A
+
+नूतन ब्रह्मचारी क्या है?
+(A) उपन्यास (B) निबंध (C) कहानी (D) सभी
+Ans: (A)
+`
+    const result = parseBulkQuestionText(rawText, 1, 'mcq')
+    expect(result.totalParsed).toBe(2)
+    expect(result.questions).toHaveLength(2)
+
+    expect(result.questions[0].prompt).toBe('निबंध लेखन की दृष्टि से भारतेन्दु युग कैसा था?')
+    expect(result.questions[0].options).toHaveLength(4)
+    expect(result.questions[0].options?.[0].isCorrect).toBe(true)
+
+    expect(result.questions[1].prompt).toBe('नूतन ब्रह्मचारी क्या है?')
+    expect(result.questions[1].options).toHaveLength(4)
+    expect(result.questions[1].options?.[0].isCorrect).toBe(true)
+  })
+
   // 4. Automatic Question Numbering: Sequential & Style Conversions
   it('generates sequential numbers in continuous and section-based modes', () => {
     expect(toRoman(1)).toBe('I')

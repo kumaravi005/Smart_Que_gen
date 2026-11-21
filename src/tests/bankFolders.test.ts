@@ -259,4 +259,114 @@ Ans: B
     expect(q.options?.[2].text).toBe('a₁/a₂ = b₁/b₂ ≠ c₁/c₂')
     expect(q.options?.[3].text).toBe('इनमें से कोई नहीं')
   })
+
+  it('parses bulk unnumbered Hindi MCQs from teacher paste (resolving single question swallow bug)', () => {
+    const rawInput = `निबंध लेखन की दृष्टि से भारतेन्दु युग कैसा था?
+(A) उर्वर (B) अनुपयोगी (C) प्रगतिशील (D) प्रतिगामी
+
+नूतन ब्रह्मचारी क्या है?
+(A) उपन्यास (B) निबंध (C) कहानी (D) सभी
+
+निम्नलिखित में से पार्वती देवी किनकी माता हैं?
+(A) बालकृष्ण भट्ट (B) चन्द्रधर शर्मा गुलेरी (C) जयप्रकाश नारायण (D) रामधारी सिंह दिनकर`
+
+    const parsed = parseBulkQuestions(rawInput)
+    expect(parsed.length).toBe(3)
+
+    // Question 1
+    expect(parsed[0].type).toBe('mcq')
+    expect(parsed[0].prompt).toBe('निबंध लेखन की दृष्टि से भारतेन्दु युग कैसा था?')
+    expect(parsed[0].options?.length).toBe(4)
+    expect(parsed[0].options?.[0].label).toBe('A')
+    expect(parsed[0].options?.[0].text).toBe('उर्वर')
+    expect(parsed[0].options?.[1].label).toBe('B')
+    expect(parsed[0].options?.[1].text).toBe('अनुपयोगी')
+    expect(parsed[0].options?.[2].label).toBe('C')
+    expect(parsed[0].options?.[2].text).toBe('प्रगतिशील')
+    expect(parsed[0].options?.[3].label).toBe('D')
+    expect(parsed[0].options?.[3].text).toBe('प्रतिगामी')
+
+    // Question 2
+    expect(parsed[1].type).toBe('mcq')
+    expect(parsed[1].prompt).toBe('नूतन ब्रह्मचारी क्या है?')
+    expect(parsed[1].options?.length).toBe(4)
+    expect(parsed[1].options?.[0].text).toBe('उपन्यास')
+    expect(parsed[1].options?.[1].text).toBe('निबंध')
+    expect(parsed[1].options?.[2].text).toBe('कहानी')
+    expect(parsed[1].options?.[3].text).toBe('सभी')
+
+    // Question 3
+    expect(parsed[2].type).toBe('mcq')
+    expect(parsed[2].prompt).toBe('निम्नलिखित में से पार्वती देवी किनकी माता हैं?')
+    expect(parsed[2].options?.length).toBe(4)
+    expect(parsed[2].options?.[0].text).toBe('बालकृष्ण भट्ट')
+    expect(parsed[2].options?.[1].text).toBe('चन्द्रधर शर्मा गुलेरी')
+    expect(parsed[2].options?.[2].text).toBe('जयप्रकाश नारायण')
+    expect(parsed[2].options?.[3].text).toBe('रामधारी सिंह दिनकर')
+  })
+
+  it('parses unnumbered tightly-packed MCQs without blank lines between questions', () => {
+    const rawInput = `निबंध लेखन की दृष्टि से भारतेन्दु युग कैसा था?
+(A) उर्वर (B) अनुपयोगी (C) प्रगतिशील (D) प्रतिगामी
+नूतन ब्रह्मचारी क्या है?
+(A) उपन्यास (B) निबंध (C) कहानी (D) सभी`
+
+    const parsed = parseBulkQuestions(rawInput)
+    expect(parsed.length).toBe(2)
+    expect(parsed[0].prompt).toBe('निबंध लेखन की दृष्टि से भारतेन्दु युग कैसा था?')
+    expect(parsed[0].options?.length).toBe(4)
+    expect(parsed[1].prompt).toBe('नूतन ब्रह्मचारी क्या है?')
+    expect(parsed[1].options?.length).toBe(4)
+  })
+
+  it('parses vertical unnumbered MCQs with Hindi labels and answer keys', () => {
+    const rawInput = `बालकृष्ण भट्ट किस काल के रचनाकार हैं?
+(क) भारतेन्दु युग
+(ख) भक्तिकाल
+(ग) रीतिकाल
+(घ) द्विवेदी युग
+उत्तर: (क)
+
+बातचीत क्या है?
+A. निबंध
+B. कहानी
+C. नाटक
+D. उपन्यास
+Ans: A`
+
+    const parsed = parseBulkQuestions(rawInput)
+    expect(parsed.length).toBe(2)
+
+    expect(parsed[0].options?.length).toBe(4)
+    expect(parsed[0].options?.[0].label).toBe('A')
+    expect(parsed[0].options?.[0].text).toBe('भारतेन्दु युग')
+    expect(parsed[0].options?.[0].isCorrect).toBe(true)
+    expect(parsed[0].answerKey).toBe('A')
+
+    expect(parsed[1].options?.length).toBe(4)
+    expect(parsed[1].options?.[0].label).toBe('A')
+    expect(parsed[1].options?.[0].text).toBe('निबंध')
+    expect(parsed[1].options?.[0].isCorrect).toBe(true)
+    expect(parsed[1].answerKey).toBe('A')
+  })
+
+  it('parses mixed numbered, Devanagari numbered, and unnumbered questions', () => {
+    const rawInput = `१. बालकृष्ण भट्ट की रचना बातचीत क्या है?
+(A) एकांकी (B) संस्मरण (C) यात्रा वृत्तांत (D) ललित निबंध
+
+बालकृष्ण भट्ट किस युग के निबंधकार थे?
+(A) प्रसाद युग (B) भारतेन्दु युग (C) द्विवेदी युग (D) स्वातंत्र्योत्तर युग
+
+३. मनुष्य की बातचीत का उत्तम तरीका क्या है?
+(A) विद्वतापूर्ण बात करना (B) तर्कपूर्ण बात करना (C) भीड़ से बात करना (D) अवाक् होकर अपने से बातचीत करना`
+
+    const parsed = parseBulkQuestions(rawInput)
+    expect(parsed.length).toBe(3)
+    expect(parsed[0].prompt).toBe('बालकृष्ण भट्ट की रचना बातचीत क्या है?')
+    expect(parsed[0].options?.length).toBe(4)
+    expect(parsed[1].prompt).toBe('बालकृष्ण भट्ट किस युग के निबंधकार थे?')
+    expect(parsed[1].options?.length).toBe(4)
+    expect(parsed[2].prompt).toBe('मनुष्य की बातचीत का उत्तम तरीका क्या है?')
+    expect(parsed[2].options?.length).toBe(4)
+  })
 })
