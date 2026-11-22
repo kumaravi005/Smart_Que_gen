@@ -140,10 +140,13 @@ function resolveMultiRowMatrices(text: string): string {
 
 /**
  * Normalizes definite integrals into ∫_{lower}^{upper}.
- * Handles LaTeX \int_{-1}^1, \int_{-1}^{1}, \int_a^b, Unicode ∫₍₋₁₎¹, ∫₋₁¹, etc.
+ * Handles:
+ * - LaTeX \int_{-1}^1, \int_{-\pi/2}^{\pi/2}, \int_1^4, \int_0^{\pi/6}
+ * - OCR quote/paren mangled: ∫₀‘π/6), ∫₍-π/2₎‘π/2), ∫₍-π/2₎⁽π/2⁾
+ * - Unicode subscripts & superscripts: ∫₍₋₁₎¹, ∫₋₁¹, ∫₁⁴
  */
 function normalizeIntegrals(text: string): string {
-  // 1. LaTeX with curly braces: \int_{-1}^{1} or \int^{1}_{-1}
+  // 1. LaTeX with curly braces: \int_{-1}^{1} or \int_{-\pi/2}^{\pi/2} or \int^{1}_{-1}
   text = text.replace(
     /\\int\s*_\s*\{([^{}]+)\}\s*\^\s*\{([^{}]+)\}/g,
     '∫_{$1}^{$2}'
@@ -153,9 +156,9 @@ function normalizeIntegrals(text: string): string {
     '∫_{$2}^{$1}'
   )
 
-  // 2. LaTeX single char/token limits: \int_{-1}^1, \int_a^b, \int_0^\pi
+  // 2. LaTeX single char/token/fraction limits: \int_{-1}^1, \int_1^4, \int_0^\pi, \int_{-\pi/2}^{\pi/2}
   text = text.replace(
-    /\\int\s*_\s*(\([^)]+\)|[a-zA-Z0-9\-\+\\]+)\s*\^\s*(\([^)]+\)|[a-zA-Z0-9\-\+\\]+)/g,
+    /\\int\s*_\s*(\([^)]+\)|[a-zA-Z0-9\-\+\\πα-ωΑ-Ω/]+)\s*\^\s*(\([^)]+\)|[a-zA-Z0-9\-\+\\πα-ωΑ-Ω/]+)/g,
     (_m, low, up) => {
       const cleanLow = low.replace(/^\((.*)\)$/, '$1').replace(/^\\/, '')
       const cleanUp = up.replace(/^\((.*)\)$/, '$1').replace(/^\\/, '')
@@ -163,7 +166,7 @@ function normalizeIntegrals(text: string): string {
     }
   )
   text = text.replace(
-    /\\int\s*\^\s*(\([^)]+\)|[a-zA-Z0-9\-\+\\]+)\s*_\s*(\([^)]+\)|[a-zA-Z0-9\-\+\\]+)/g,
+    /\\int\s*\^\s*(\([^)]+\)|[a-zA-Z0-9\-\+\\πα-ωΑ-Ω/]+)\s*_\s*(\([^)]+\)|[a-zA-Z0-9\-\+\\πα-ωΑ-Ω/]+)/g,
     (_m, up, low) => {
       const cleanLow = low.replace(/^\((.*)\)$/, '$1').replace(/^\\/, '')
       const cleanUp = up.replace(/^\((.*)\)$/, '$1').replace(/^\\/, '')
@@ -171,27 +174,41 @@ function normalizeIntegrals(text: string): string {
     }
   )
 
-  // 3. Already converted Unicode subscripts & superscripts: e.g. ∫₍₋₁₎¹ or ∫₋₁¹
+  // 3. OCR quote/paren mangled upper limits: e.g. ∫₀‘π/6), ∫₍-π/2₎‘π/2), ∫₍-π/2₎⁽π/2⁾, ∫₀⁽π/6⁾, ∫₍-1₎'1'
   text = text.replace(
-    /∫\s*(?:₍([^₎]+)₎|([₀₁₂₃₄₅₆₇₈₉₋₊aeoxnijk]+))\s*(?:⁽([^⁾]+)⁾|\^\{([^{}]+)\}|\^([a-zA-Z0-9\-\+]+)|([¹²³⁴⁵⁶⁷⁸⁹⁰⁺⁻n]+))/g,
-    (_m, sub1, sub2, sup1, sup2, sup3, sup4) => {
-      const rawSub = sub1 || sub2 || ''
-      const rawSup = sup1 || sup2 || sup3 || sup4 || ''
+    /∫\s*(?:₍([^₎]+)₎|_\{([^{}]+)\}|_\(([^)]+)\)|_([a-zA-Z0-9\-\+\\πα-ωΑ-Ω/]+)|([₀₁₂₃₄₅₆₇₈₉₋₊aeoxnijk]+))\s*(?:[‘'⁽]\s*([^)\r\n’'⁾]+?)\s*[\)⁾’']|\^\{([^{}]+)\}|\^\(([^)]+)\)|\^([a-zA-Z0-9\-\+\\πα-ωΑ-Ω/]+)|([⁰¹²³⁴⁵⁶⁷⁸⁹ⁿ⁺⁻]+))/g,
+    (_m, sub1, sub2, sub3, sub4, sub5, sup1, sup2, sup3, sup4, sup5) => {
+      const rawSub = sub1 || sub2 || sub3 || sub4 || sub5 || ''
+      const rawSup = sup1 || sup2 || sup3 || sup4 || sup5 || ''
       const normalSub = rawSub
         .split('')
         .map((ch: string) => SUBSCRIPT_MAP[ch] || ch)
         .join('')
         .replace(/^\((.*)\)$/, '$1')
+        .replace(/^\\/, '')
+        .trim()
       const normalSup = rawSup
         .split('')
         .map((ch: string) => SUPERSCRIPT_MAP[ch] || ch)
         .join('')
         .replace(/^\((.*)\)$/, '$1')
+        .replace(/^\\/, '')
+        .trim()
       return `∫_{${normalSub}}^{${normalSup}}`
     }
   )
 
-  // 4. Standalone \int -> ∫
+  // 4. Unicode subscripts & superscripts: e.g. ∫₍₋₁₎¹ or ∫₋₁¹ or ∫₁⁴
+  text = text.replace(
+    /∫\s*([₀₁₂₃₄₅₆₇₈₉₋₊]+)\s*([⁰¹²³⁴⁵⁶⁷⁸⁹ⁿ⁺⁻]+)/g,
+    (_m, sub, sup) => {
+      const normalSub = sub.split('').map((ch: string) => SUBSCRIPT_MAP[ch] || ch).join('')
+      const normalSup = sup.split('').map((ch: string) => SUPERSCRIPT_MAP[ch] || ch).join('')
+      return `∫_{${normalSub}}^{${normalSup}}`
+    }
+  )
+
+  // 5. Standalone \int -> ∫
   text = text.replace(/\\int(?![a-zA-Z])/g, '∫')
   return text
 }

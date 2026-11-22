@@ -74,6 +74,50 @@ describe('FormattedMathText Component', () => {
     expect(html2).toContain('-1')
     expect(html2).toContain('cos')
     expect(html2).toContain('dx')
+
+    // Question #18 from user screenshot: ∫₀‘π/6) cos x · cos 2x dx =
+    const htmlQ18 = renderToString(React.createElement(FormattedMathText, { text: '18. ∫₀‘π/6) cos x · cos 2x dx =' }))
+    expect(htmlQ18).toContain('∫')
+    expect(htmlQ18).toContain('π/6')
+    expect(htmlQ18).toContain('0')
+    expect(htmlQ18).toContain('cos')
+    expect(htmlQ18).toContain('dx')
+
+    // Question #15 from user screenshot: ∫₍-π/2₎‘π/2) sin ⁷ x dx =
+    const htmlQ15 = renderToString(React.createElement(FormattedMathText, { text: '15. ∫₍-π/2₎‘π/2) sin ⁷ x dx =' }))
+    expect(htmlQ15).toContain('∫')
+    expect(htmlQ15).toContain('π/2')
+    expect(htmlQ15).toContain('-π/2')
+    expect(htmlQ15).toContain('sin')
+    expect(htmlQ15).toContain('dx')
+
+    // Question #19 from user screenshot: 19. ∫_1^4 ( 1/√x ) dx =
+    const htmlQ19 = renderToString(React.createElement(FormattedMathText, { text: '19. \\int_1^4 ( \\frac{1}{\\sqrt{x}} ) dx =' }))
+    expect(htmlQ19).toContain('∫')
+    expect(htmlQ19).toContain('4')
+    expect(htmlQ19).toContain('1')
+    expect(htmlQ19).toContain('√x')
+    expect(htmlQ19).toContain('border-b')
+  })
+
+  it('renders fractions with Greek symbols and negative signs (Screenshot Q18 & Q19)', () => {
+    // Greek fractions from Q19 options: π/6, π/4, π/2
+    const htmlPi6 = renderToString(React.createElement(FormattedMathText, { text: 'π/6', isOption: true }))
+    expect(htmlPi6).toContain('border-b')
+    expect(htmlPi6).toContain('π')
+    expect(htmlPi6).toContain('6')
+
+    const htmlPi2 = renderToString(React.createElement(FormattedMathText, { text: 'π/2', isOption: true }))
+    expect(htmlPi2).toContain('border-b')
+    expect(htmlPi2).toContain('π')
+    expect(htmlPi2).toContain('2')
+
+    // Negative fraction from Q18 Option (d): - 5/12
+    const htmlNeg = renderToString(React.createElement(FormattedMathText, { text: '- 5/12', isOption: true }))
+    expect(htmlNeg).toContain('border-b')
+    expect(htmlNeg).toContain('-')
+    expect(htmlNeg).toContain('5')
+    expect(htmlNeg).toContain('12')
   })
 
   it('renders 3x3 determinants with vertical bars and aligned rows/columns (Screenshot 3)', () => {

@@ -223,13 +223,14 @@ function tokenizeMathText(text: string): MathToken[] {
 
   // 6. Definite Integrals:
   // - LaTeX/Unicode: ∫_{lower}^{upper}, \int_{lower}^{upper}, ∫^{upper}_{lower}
-  // - Unicode subscripts & superscripts: ∫₍₋₁₎¹, ∫₋₁¹, ∫₀¹
-  // - Simple limits: \int_{-1}^1, ∫_a^b
+  // - OCR quote/paren mangled: ∫₀‘π/6), ∫₍-π/2₎‘π/2), ∫₍-π/2₎⁽π/2⁾
+  // - Unicode subscripts & superscripts: ∫₍₋₁₎¹, ∫₋₁¹, ∫₁⁴
+  // - Simple limits: \int_{-1}^1, ∫_a^b, \int_1^4, \int_{-\pi/2}^{\pi/2}
   const defIntRegex =
-    /(?:\\int|∫)\s*(?:_\{([^{}]+)\}|_\(([^)]+)\)|_([a-zA-Z0-9\-\+\\π]+)|₍([^₎]+)₎|([₀₁₂₃₄₅₆₇₈₉₋₊aeoxnijk]+))\s*(?:\^\{([^{}]+)\}|\^\(([^)]+)\)|\^([a-zA-Z0-9\-\+\\π]+)|⁽([^⁾]+)⁾|([⁰¹²³⁴⁵⁶⁷⁸⁹ⁿ⁺⁻]+))/g
+    /(?:\\int|∫)\s*(?:_\{([^{}]+)\}|_\(([^)]+)\)|_([a-zA-Z0-9\-\+\\πα-ωΑ-Ω/]+)|₍([^₎]+)₎|([₀₁₂₃₄₅₆₇₈₉₋₊aeoxnijk]+))\s*(?:[‘'⁽]\s*([^)\r\n’'⁾]+?)\s*[\)⁾’']|\^\{([^{}]+)\}|\^\(([^)]+)\)|\^([a-zA-Z0-9\-\+\\πα-ωΑ-Ω/]+)|⁽([^⁾]+)⁾|([⁰¹²³⁴⁵⁶⁷⁸⁹ⁿ⁺⁻]+))/g
   while ((m = defIntRegex.exec(cleaned)) !== null) {
     const rawLower = m[1] || m[2] || m[3] || m[4] || m[5] || ''
-    const rawUpper = m[6] || m[7] || m[8] || m[9] || m[10] || ''
+    const rawUpper = m[6] || m[7] || m[8] || m[9] || m[10] || m[11] || ''
     matches.push({
       type: 'integral',
       start: m.index,
@@ -241,10 +242,10 @@ function tokenizeMathText(text: string): MathToken[] {
 
   // Reverse limit order: ∫^{upper}_{lower}
   const defIntReverseRegex =
-    /(?:\\int|∫)\s*(?:\^\{([^{}]+)\}|\^\(([^)]+)\)|\^([a-zA-Z0-9\-\+\\π]+)|⁽([^⁾]+)⁾|([⁰¹²³⁴⁵⁶⁷⁸⁹ⁿ⁺⁻]+))\s*(?:_\{([^{}]+)\}|_\(([^)]+)\)|_([a-zA-Z0-9\-\+\\π]+)|₍([^₎]+)₎|([₀₁₂₃₄₅₆₇₈₉₋₊aeoxnijk]+))/g
+    /(?:\\int|∫)\s*(?:[‘'⁽]\s*([^)\r\n’'⁾]+?)\s*[\)⁾’']|\^\{([^{}]+)\}|\^\(([^)]+)\)|\^([a-zA-Z0-9\-\+\\πα-ωΑ-Ω/]+)|⁽([^⁾]+)⁾|([⁰¹²³⁴⁵⁶⁷⁸⁹ⁿ⁺⁻]+))\s*(?:_\{([^{}]+)\}|_\(([^)]+)\)|_([a-zA-Z0-9\-\+\\πα-ωΑ-Ω/]+)|₍([^₎]+)₎|([₀₁₂₃₄₅₆₇₈₉₋₊aeoxnijk]+))/g
   while ((m = defIntReverseRegex.exec(cleaned)) !== null) {
-    const rawUpper = m[1] || m[2] || m[3] || m[4] || m[5] || ''
-    const rawLower = m[6] || m[7] || m[8] || m[9] || m[10] || ''
+    const rawUpper = m[1] || m[2] || m[3] || m[4] || m[5] || m[6] || ''
+    const rawLower = m[7] || m[8] || m[9] || m[10] || m[11] || ''
     matches.push({
       type: 'integral',
       start: m.index,
@@ -286,9 +287,9 @@ function tokenizeMathText(text: string): MathToken[] {
     }
   }
 
-  // 9. Bracketed fractions with optional powers: e.g. [n(n + 1)/2]² or (n(n + 1)/2)^2
+  // 9. Bracketed fractions with optional powers: e.g. (1/√x), [n(n + 1)/2]²
   const bracketedFracRegex =
-    /([\[\(])\s*([^/\[\]\(\)]+(?:\([^)]*\)[^/\[\]\(\)]*)*)\s*\/\s*([^/\[\]\(\)]+(?:\([^)]*\)[^/\[\]\(\)]*)*)\s*([\]\)])(?:\s*([\^²³⁴⁰¹⁵⁶⁷⁸⁹₀₁₂₃₄₅₆₇₈₉\d+n-]+))?/g
+    /([\[\(])\s*(-?\s*[^/\[\]\(\)]+(?:\([^)]*\)[^/\[\]\(\)]*)*)\s*\/\s*([^/\[\]\(\)]+(?:\([^)]*\)[^/\[\]\(\)]*)*)\s*([\]\)])(?:\s*([\^²³⁴⁰¹⁵⁶⁷⁸⁹₀₁₂₃₄₅₆₇₈₉\d+n-]+))?/g
   while ((m = bracketedFracRegex.exec(cleaned)) !== null) {
     matches.push({
       type: 'bracketed_frac',
@@ -302,9 +303,9 @@ function tokenizeMathText(text: string): MathToken[] {
     })
   }
 
-  // 10. Standard fractions: e.g. n(n + 1)(2n + 1)/6, n(n + 1)/2, 1/2, a₁/a₂, 3/17, 14/3
+  // 10. Standard fractions: e.g. n(n + 1)(2n + 1)/6, 1/2, π/6, π/4, π/2, 5/12, - 5/12
   const fractionRegex =
-    /(?:(\([^)]+\)|[a-zA-Z0-9\u0900-\u097F²³⁴⁰¹⁵⁶⁷⁸⁹₀₁₂₃₄₅₆₇₈₉ₐₑₒₓₙᵢⱼₖ√]+(?:\([^)]*\))*[a-zA-Z0-9\u0900-\u097F²³⁴⁰¹⁵⁶⁷⁸⁹₀₁₂₃₄₅₆₇₈₉ₐₑₒₓₙᵢⱼₖ√]*))\s*\/\s*(?:(\([^)]+\)|[a-zA-Z0-9\u0900-\u097F²³⁴⁰¹⁵⁶⁷⁸⁹₀₁₂₃₄₅₆₇₈₉ₐₑₒₓₙᵢⱼₖ√]+))/g
+    /(?:(-?\s*(?:\([^)]+\)|[a-zA-Z0-9\u0900-\u097F\u0370-\u03FF²³⁴⁰¹⁵⁶⁷⁸⁹₀₁₂₃₄₅₆₇₈₉ₐₑₒₓₙᵢⱼₖ√]+(?:\([^)]*\))*[a-zA-Z0-9\u0900-\u097F\u0370-\u03FF²³⁴⁰¹⁵⁶⁷⁸⁹₀₁₂₃₄₅₆₇₈₉ₐₑₒₓₙᵢⱼₖ√]*)))\s*\/\s*(?:(\([^)]+\)|[a-zA-Z0-9\u0900-\u097F\u0370-\u03FF²³⁴⁰¹⁵⁶⁷⁸⁹₀₁₂₃₄₅₆₇₈₉ₐₑₒₓₙᵢⱼₖ√]+))/g
   while ((m = fractionRegex.exec(cleaned)) !== null) {
     matches.push({
       type: 'fraction',
@@ -495,27 +496,41 @@ const InlineTextSegment: React.FC<{ content: string; mathSerif?: boolean }> = ({
 
 /**
  * Visual Math Fraction Component.
- * Renders vertical stacked fractions (numerator over denominator with horizontal bar).
+ * Renders vertical stacked fractions (numerator over denominator with horizontal bar)
+ * with support for leading negative signs positioned in front of the fraction bar.
  */
 const VerticalFraction: React.FC<{ num: string; den: string; mathSerif?: boolean }> = ({
   num,
   den,
   mathSerif = true
 }) => {
-  const cleanNum = cleanTerm(num)
+  let cleanNum = cleanTerm(num)
   const cleanDen = cleanTerm(den)
+  let isNegative = false
+
+  if (cleanNum.startsWith('-')) {
+    isNegative = true
+    cleanNum = cleanNum.replace(/^-\s*/, '').trim()
+  }
 
   return (
-    <span
-      className={`inline-flex flex-col items-center justify-center text-center align-middle mx-1 my-0.5 leading-none select-text ${
-        mathSerif ? 'font-serif' : 'font-sans'
-      }`}
-    >
-      <span className="border-b border-current px-1 pb-0.5 text-center text-[0.92em] font-medium leading-tight">
-        <InlineTextSegment content={cleanNum} mathSerif={mathSerif} />
-      </span>
-      <span className="px-1 pt-0.5 text-center text-[0.92em] font-medium leading-tight">
-        <InlineTextSegment content={cleanDen} mathSerif={mathSerif} />
+    <span className="inline-flex items-center align-middle mx-1 my-0.5 leading-none select-text">
+      {isNegative && (
+        <span className="font-semibold text-slate-900 mr-1 select-text text-[1.1em] -translate-y-px">
+          -
+        </span>
+      )}
+      <span
+        className={`inline-flex flex-col items-center justify-center text-center leading-none ${
+          mathSerif ? 'font-serif' : 'font-sans'
+        }`}
+      >
+        <span className="border-b border-current px-1 pb-0.5 text-center text-[0.92em] font-medium leading-tight">
+          <InlineTextSegment content={cleanNum} mathSerif={mathSerif} />
+        </span>
+        <span className="px-1 pt-0.5 text-center text-[0.92em] font-medium leading-tight">
+          <InlineTextSegment content={cleanDen} mathSerif={mathSerif} />
+        </span>
       </span>
     </span>
   )
@@ -523,7 +538,8 @@ const VerticalFraction: React.FC<{ num: string; den: string; mathSerif?: boolean
 
 /**
  * Bracketed Fraction Component.
- * Renders tall brackets enclosing a vertical fraction, with an optional exponent (e.g. [n(n+1)/2]²).
+ * Renders tall brackets/parentheses vertically stretched to fully encompass
+ * the height of stacked fractions (e.g. (1/√x), [n(n+1)/2]²).
  */
 const BracketedFraction: React.FC<{
   open?: string
@@ -542,12 +558,12 @@ const BracketedFraction: React.FC<{
     : ''
 
   return (
-    <span className="inline-flex items-center align-middle mx-0.5 my-0.5 select-text leading-none">
-      <span className="text-xl sm:text-2xl font-light text-slate-700 leading-none select-none inline-block -translate-y-[1px]">
+    <span className="inline-flex items-center align-middle mx-1 my-0.5 select-text leading-none">
+      <span className="text-2xl sm:text-3xl font-extralight text-slate-800 leading-none select-none inline-block scale-y-125 mx-0.5 -translate-y-px">
         {open}
       </span>
       <VerticalFraction num={num} den={den} mathSerif={mathSerif} />
-      <span className="text-xl sm:text-2xl font-light text-slate-700 leading-none select-none inline-block -translate-y-[1px]">
+      <span className="text-2xl sm:text-3xl font-extralight text-slate-800 leading-none select-none inline-block scale-y-125 mx-0.5 -translate-y-px">
         {close}
       </span>
       {normalPower && (
@@ -626,7 +642,7 @@ const DefiniteIntegral: React.FC<{
 }> = ({ lower, upper, mathSerif = true }) => {
   if (!lower && !upper) {
     return (
-      <span className="inline-block text-2xl font-light font-serif leading-none align-middle mx-0.5 select-text text-slate-900">
+      <span className="inline-block text-2xl sm:text-3xl font-light font-serif leading-none align-middle mx-0.5 select-text text-slate-900">
         ∫
       </span>
     )
@@ -634,15 +650,15 @@ const DefiniteIntegral: React.FC<{
 
   return (
     <span className="inline-flex items-center align-middle mx-1 my-0.5 select-text font-serif">
-      <span className="text-2xl sm:text-3xl font-light leading-none select-none text-slate-900 -translate-y-0.5">
+      <span className="text-3xl sm:text-4xl font-light leading-none select-none text-slate-900 pr-1">
         ∫
       </span>
-      <span className="inline-flex flex-col text-[0.72em] font-medium leading-[0.85] -ml-1 justify-between h-[1.85em] select-text">
-        <span className="leading-none text-left -translate-y-0.5">
-          <FormattedMathText text={upper || ''} inline mathSerif={mathSerif} />
+      <span className="inline-flex flex-col justify-between h-[2.2em] text-[0.72em] font-medium leading-none select-text -translate-y-[1px]">
+        <span className="leading-none text-left whitespace-nowrap">
+          <InlineTextSegment content={upper || ''} mathSerif={mathSerif} />
         </span>
-        <span className="leading-none text-left translate-y-0.5">
-          <FormattedMathText text={lower || ''} inline mathSerif={mathSerif} />
+        <span className="leading-none text-left whitespace-nowrap">
+          <InlineTextSegment content={lower || ''} mathSerif={mathSerif} />
         </span>
       </span>
     </span>
