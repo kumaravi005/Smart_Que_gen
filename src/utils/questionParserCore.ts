@@ -77,19 +77,108 @@ export const INSTRUCTION_REGEX = /(?:^|[\s\r\n]+)(?:Note|Instruction|निर�
 
 export const OPT_REGEX = /(?:^|[\s\r\n]+)(?:[•*·\-–—]\s*|[oO]\s+)?(?:\(([A-Ea-e1-5]|[\u0915-\u0919])\)\s*|\[([A-Ea-e1-5]|[\u0915-\u0919])\]\s*|(?:([A-Ea-e]|[\u0915-\u0919])|([1-5])(?!\.\d))[:.)\]\-]\s*)([\s\S]*?)(?=(?:[\s\r\n]+(?:[•*·\-–—]\s*|[oO]\s+)?(?:\(([A-Ea-e1-5]|[\u0915-\u0919])\)\s*|\[([A-Ea-e1-5]|[\u0915-\u0919])\]\s*|(?:([A-Ea-e]|[\u0915-\u0919])|([1-5])(?!\.\d))[:.)\]\-]\s*))|$)/g
 
+// Matches board citation tags like [BSEB, 2024 (A)], [2023 A], (CBSE 2023, Set-A), [2024 (A)], 2024 (A)
+const BOARD_TERMS = '(?:19\\d\\d|20\\d\\d|B\\.?S\\.?E\\.?B\\.?|C\\.?B\\.?S\\.?E\\.?|I\\.?C\\.?S\\.?E\\.?|N\\.?C\\.?E\\.?R\\.?T\\.?|J\\.?A\\.?C\\.?|UP\\s*Board|MP\\s*Board|Bihar(?:\\s*Board)?|Board|Annual|Compartment(?:al)?|Model\\s*Paper|Set[-\\s]*[A-Za-z0-9]|बिहार(?:\\s*बोर्ड)?|झारखंड(?:\\s*बोर्ड)?|उत्तर\\s*प्रदेश|बोर्ड|वार्षिक)'
+
+// Safe, non-backtracking regex for board citations:
+export const BOARD_CITATION_REGEX = new RegExp(
+  '(?:' +
+    // 1. Square brackets: [BSEB, 2024 (A)], [2023 A], [NCERT], [Set-A]
+    '\\[[^\\]\\r\\n]{0,60}?' + BOARD_TERMS + '[^\\]\\r\\n]{0,60}?\\]' +
+    '|' +
+    // 2. Nested parens: (CBSE 2023 (Set-A)), (BSEB 2024 (A)), (2024 (A))
+    '\\([^()\\r\\n]{0,40}?' + BOARD_TERMS + '[^()\\r\\n]{0,30}\\([^()\\r\\n]{1,15}\\)[^()\\r\\n]{0,30}\\)' +
+    '|' +
+    // 3. Simple parens: (CBSE 2023, Set-A), (BSEB 2024), (2023 A)
+    '\\([^()\\r\\n]{0,60}?' + BOARD_TERMS + '[^()\\r\\n]{0,60}?\\)' +
+    '|' +
+    // 4. Bare year with set letter like "2024 (A)" or "2023 A"
+    '\\b(?:19\\d\\d|20\\d\\d)\\s*[,/]?\\s*(?:\\([A-Da-d1-4]\\)|\\b[A-Da-d]\\b)' +
+  ')',
+  'gi'
+)
+
+/**
+ * Protects board exam citations (e.g. "[BSEB, 2024 (A)]") by replacing them with unique placeholders
+ * so that citation set letters like "(A)" are never mistakenly parsed as question options.
+ */
+export function maskCitations(text: string): { maskedText: string; restore: (str: string) => string } {
+  const map: { placeholder: string; original: string }[] = []
+  const maskedText = text.replace(BOARD_CITATION_REGEX, (m) => {
+    const placeholder = `__BOARD_CITATION_${map.length}__`
+    map.push({ placeholder, original: m })
+    return placeholder
+  })
+  const restore = (str: string) => {
+    let res = str
+    for (const { placeholder, original } of map) {
+      res = res.replaceAll(placeholder, original)
+    }
+    return res
+  }
+  return { maskedText, restore }
+}
+
+/**
+ * Validates and extracts the real consecutive MCQ options sequence (e.g. A, B, C, D)
+ * preventing incidental single letters or false matches from contaminating options.
+ */
+export function findBestOptionMatches(matches: RegExpExecArray[]): RegExpExecArray[] {
+  if (matches.length < 2) return []
+
+  // Look from the end backwards for where option 'A' is followed by 'B'
+  for (let i = matches.length - 2; i >= 0; i--) {
+    const rawI = matches[i][1] || matches[i][2] || matches[i][3] || matches[i][4] || ''
+    const rawNext = matches[i + 1][1] || matches[i + 1][2] || matches[i + 1][3] || matches[i + 1][4] || ''
+    const labelI = normalizeOptionLabel(rawI)
+    const labelNext = normalizeOptionLabel(rawNext)
+
+    if (labelI === 'A' && labelNext === 'B') {
+      const seq = [matches[i]]
+      const expected = ['A', 'B', 'C', 'D', 'E', 'F']
+      let expIdx = 1
+      for (let j = i + 1; j < matches.length; j++) {
+        const rawJ = matches[j][1] || matches[j][2] || matches[j][3] || matches[j][4] || ''
+        const lbl = normalizeOptionLabel(rawJ)
+        if (lbl === expected[expIdx]) {
+          seq.push(matches[j])
+          expIdx++
+        }
+      }
+      if (seq.length >= 2) return seq
+    }
+  }
+
+  // Fallback: check if labels have both A and B
+  const labels = matches.map(m => normalizeOptionLabel(m[1] || m[2] || m[3] || m[4] || ''))
+  const hasA = labels.includes('A')
+  const hasB = labels.includes('B')
+  if (hasA && hasB) {
+    const firstAIdx = labels.indexOf('A')
+    return matches.slice(firstAIdx)
+  }
+
+  return matches.length >= 2 ? matches : []
+}
+
 export function containsHorizontalOptions(line: string): boolean {
+  const { maskedText } = maskCitations(line)
   OPT_REGEX.lastIndex = 0
-  const matches = Array.from(line.matchAll(OPT_REGEX))
-  return matches.length >= 2
+  const matches = Array.from(maskedText.matchAll(OPT_REGEX))
+  if (matches.length < 2) return false
+  const best = findBestOptionMatches(matches)
+  return best.length >= 2
 }
 
 export function startsWithOptionA(line: string): boolean {
-  const t = line.trim()
+  const { maskedText } = maskCitations(line)
+  const t = maskedText.trim()
   return /^(?:[•*·\-–—]\s*|[oO]\s+)?(?:\([Aa1\u0915]\)|\[[Aa1\u0915]\]|(?:[Aa\u0915])[:.)\]\-]\s*)/i.test(t)
 }
 
 export function isOptionLine(line: string): boolean {
-  const t = line.trim()
+  const { maskedText } = maskCitations(line)
+  const t = maskedText.trim()
   // Parenthesized or bracketed options: (A), (a), (1), (क), [A], [a], [1], [क]
   if (/^(?:[•*·\-–—]\s*|[oO]\s+)?(?:\([A-Ea-e1-5\u0915-\u0919]\)|\[[A-Ea-e1-5\u0915-\u0919]\])/i.test(t)) {
     return true
@@ -104,8 +193,31 @@ export function isOptionLine(line: string): boolean {
 
 export function isExplicitQuestionStart(line: string): boolean {
   const norm = normalizeDevanagariDigits(line.trim())
-  if (containsHorizontalOptions(line)) return false
-  return Q_START_REGEX.test(norm)
+  if (!Q_START_REGEX.test(norm)) return false
+
+  // If the line also contains horizontal options, ensure it's not just an option line like:
+  // "1. Option One  2. Option Two  3. Option Three"
+  if (containsHorizontalOptions(line)) {
+    // If it starts with Q / Question / प्रश्न, it's explicitly a question
+    if (/^(?:Q(?:uestion)?|Que(?:s)?|प्रश्न|प्र(?:०|\.)?(?:सं(?:०|\.)?)?)/i.test(norm)) {
+      return true
+    }
+    const { maskedText } = maskCitations(line)
+    OPT_REGEX.lastIndex = 0
+    const matches = Array.from(maskedText.matchAll(OPT_REGEX))
+    const best = findBestOptionMatches(matches)
+    if (best.length >= 2) {
+      const firstOptIndex = best[0].index
+      const prefixBeforeOpt = maskedText.slice(0, firstOptIndex).trim()
+      // If there is meaningful question prompt text before the first option, it is a question
+      if (prefixBeforeOpt.length > 5) {
+        return true
+      }
+    }
+    return false
+  }
+
+  return true
 }
 
 export function isMetaLine(line: string): boolean {
@@ -208,8 +320,11 @@ export function extractQuestionDetails(
     textToParse = promptFirstLine || rawText
   }
 
-  // Check for inline answer key inside textToParse
-  const inlineAns = textToParse.match(ANSWER_KEY_REGEX)
+  // Check for inline answer key inside textToParse (mask citations first so citations aren't touched)
+  const { maskedText, restore } = maskCitations(textToParse)
+
+  let maskedParseText = maskedText
+  const inlineAns = maskedParseText.match(ANSWER_KEY_REGEX)
   if (inlineAns) {
     const rawAns = (inlineAns[1] || inlineAns[2] || '').trim()
     const normAns = normalizeOptionLabel(rawAns)
@@ -218,31 +333,34 @@ export function extractQuestionDetails(
     } else if (!explanation) {
       explanation = rawAns
     }
-    textToParse = textToParse.replace(inlineAns[0], '').trim()
+    maskedParseText = maskedParseText.replace(inlineAns[0], '').trim()
   }
 
   // Parse options
   OPT_REGEX.lastIndex = 0
-  const optMatches: RegExpExecArray[] = []
+  const rawOptMatches: RegExpExecArray[] = []
   let m: RegExpExecArray | null
-  while ((m = OPT_REGEX.exec(textToParse)) !== null) {
-    optMatches.push(m)
+  while ((m = OPT_REGEX.exec(maskedParseText)) !== null) {
+    rawOptMatches.push(m)
   }
+  const optMatches = findBestOptionMatches(rawOptMatches)
 
-  let prompt = textToParse
+  let prompt = restore(maskedParseText)
   let options: CoreParsedOption[] | undefined
 
   if (optMatches.length >= 2) {
     const firstOpt = optMatches[0]
-    prompt = textToParse.slice(0, firstOpt.index).trim()
+    prompt = restore(maskedParseText.slice(0, firstOpt.index).trim())
 
     options = optMatches.map(match => {
       const rawLabel = (match[1] || match[2] || match[3] || match[4] || '').trim()
       const label = normalizeOptionLabel(rawLabel)
       let optText = (match[5] || '')
-        .replace(/^[:.)\]\-\s]+/, '')
+        .replace(/^[:.)\]\s]+/, '')
         .replace(/[\s\r\n]+/g, ' ')
         .trim()
+
+      optText = restore(optText)
 
       // Check if tail of option text has Answer Key: e.g. "(D) प्रतिगामी Ans: A"
       const tailAns = optText.match(ANSWER_KEY_REGEX)

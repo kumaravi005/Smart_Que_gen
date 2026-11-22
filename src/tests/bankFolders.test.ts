@@ -1,11 +1,20 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest'
 import 'fake-indexeddb/auto'
 
 import { bankService } from '../services/bankService'
+import { syncService } from '../services/syncService'
 import { parseBulkQuestions } from '../utils/bulkQuestionParser'
 
 
 describe('Question Bank - Folders and Bulk Parser', () => {
+  beforeAll(() => {
+    vi.spyOn(syncService, 'triggerDebouncedSync').mockImplementation(() => {})
+  })
+
+  afterAll(() => {
+    vi.restoreAllMocks()
+    syncService.unsubscribeRealtime()
+  })
   it('parses bulk pasted questions including MCQs, marks, and answers', () => {
     const rawPasted = `
 1. What is the SI unit of electric current?
@@ -435,5 +444,83 @@ Ans: A`
     // Verify folder now has 0 questions
     const after = await bankService.getQuestions({ folderId: folder.id })
     expect(after.length).toBe(0)
+  })
+
+  it('correctly parses bulk questions containing board exam citations with set letters like [BSEB, 2024 (A)] without splitting questions', () => {
+    const rawInput = `1. cos⁻¹(-1/2) = [BSEB, 2024 (A)]
+(A) 2π/3   (B) π/3   (C) π/6   (D) π/2
+2. x ∈ [-1, 1], cos⁻¹ x = [BSEB, 2024 (A)]
+(A) π/2 - cot⁻¹ x   (B) π/2 - sin⁻¹ x   (C) π/2 - tan⁻¹ x   (D) π/2 - sec⁻¹ x
+3. x ∈ [-1, 1], sin⁻¹(-x) = [BSEB, 2024 (A)]
+(A) -sin⁻¹ x   (B) sin⁻¹ x   (C) -cos⁻¹ x   (D) cos⁻¹ x
+4. x ≥ 1 या x ≤ -1, cosec⁻¹ x = [BSEB, 2024 (A)]
+(A) π/2 - sec⁻¹ x   (B) π/2 - cos⁻¹ x   (C) π/2 - tan⁻¹ x   (D) इनमें से कोई नहीं`
+
+    const parsed = parseBulkQuestions(rawInput)
+    expect(parsed.length).toBe(4)
+
+    // Question 1
+    expect(parsed[0].type).toBe('mcq')
+    expect(parsed[0].prompt).toBe('cos⁻¹(-1/2) = [BSEB, 2024 (A)]')
+    expect(parsed[0].options?.length).toBe(4)
+    expect(parsed[0].options?.[0].label).toBe('A')
+    expect(parsed[0].options?.[0].text).toBe('2π/3')
+    expect(parsed[0].options?.[1].label).toBe('B')
+    expect(parsed[0].options?.[1].text).toBe('π/3')
+    expect(parsed[0].options?.[2].label).toBe('C')
+    expect(parsed[0].options?.[2].text).toBe('π/6')
+    expect(parsed[0].options?.[3].label).toBe('D')
+    expect(parsed[0].options?.[3].text).toBe('π/2')
+
+    // Question 2: check that interval [-1, 1] is preserved and citation is intact
+    expect(parsed[1].type).toBe('mcq')
+    expect(parsed[1].prompt).toBe('x ∈ [-1, 1], cos⁻¹ x = [BSEB, 2024 (A)]')
+    expect(parsed[1].options?.length).toBe(4)
+    expect(parsed[1].options?.[0].text).toBe('π/2 - cot⁻¹ x')
+    expect(parsed[1].options?.[1].text).toBe('π/2 - sin⁻¹ x')
+
+    // Question 3
+    expect(parsed[2].type).toBe('mcq')
+    expect(parsed[2].prompt).toBe('x ∈ [-1, 1], sin⁻¹(-x) = [BSEB, 2024 (A)]')
+    expect(parsed[2].options?.length).toBe(4)
+    expect(parsed[2].options?.[0].text).toBe('-sin⁻¹ x')
+
+    // Question 4
+    expect(parsed[3].type).toBe('mcq')
+    expect(parsed[3].prompt).toBe('x ≥ 1 या x ≤ -1, cosec⁻¹ x = [BSEB, 2024 (A)]')
+    expect(parsed[3].options?.length).toBe(4)
+    expect(parsed[3].options?.[0].text).toBe('π/2 - sec⁻¹ x')
+  })
+
+  it('correctly handles various board citations like (CBSE 2023, Set-A), [2023 A], and 2024 (A)', () => {
+    const rawInput = `1. Which of the following is a unit vector? (CBSE 2023, Set-A)
+(A) i + j (B) (i + j)/√2 (C) i - j (D) 2i
+
+2. If matrix A is orthogonal, then |A| is equal to: [2023 A]
+(A) ±1 (B) 0 (C) 2 (D) -2
+
+3. The derivative of e^x with respect to x is: 2024 (A)
+(A) e^x (B) xe^(x-1) (C) log x (D) 1/x`
+
+    const parsed = parseBulkQuestions(rawInput)
+    expect(parsed.length).toBe(3)
+
+    expect(parsed[0].type).toBe('mcq')
+    expect(parsed[0].prompt).toContain('(CBSE 2023, Set')
+    expect(parsed[0].options?.length).toBe(4)
+    expect(parsed[0].options?.[0].label).toBe('A')
+    expect(parsed[0].options?.[0].text).toBe('i + j')
+
+    expect(parsed[1].type).toBe('mcq')
+    expect(parsed[1].prompt).toContain('[2023 A]')
+    expect(parsed[1].options?.length).toBe(4)
+    expect(parsed[1].options?.[0].label).toBe('A')
+    expect(parsed[1].options?.[0].text).toBe('±1')
+
+    expect(parsed[2].type).toBe('mcq')
+    expect(parsed[2].prompt).toContain('2024 (A)')
+    expect(parsed[2].options?.length).toBe(4)
+    expect(parsed[2].options?.[0].label).toBe('A')
+    expect(parsed[2].options?.[0].text).toBe('eˣ')
   })
 })
