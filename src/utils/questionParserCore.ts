@@ -70,7 +70,28 @@ export const Q_START_REGEX = /^(?:(?:Q(?:uestion)?|Que(?:s)?|प्रश्न|
 
 export const MARKS_REGEX = /(?:\[|\()?\s*(\d+)\s*(?:Marks?|M|Pts?|Points?|अंक)\s*(?:\]|\))/i
 
-export const ANSWER_KEY_REGEX = /(?:^|[\s\r\n]+)(?:Ans(?:wer)?|Key|Correct(?:\s*Option)?|उत्तर|हल|सही\s*उत्तर)\s*[:=-]\s*(?:\(?([A-Ea-e1-5]|[\u0915-\u0919])\)?|([^\r\n]+))/i
+export const ANSWER_KEY_REGEX = /(?:^|[\s\r\n]+)(?:Ans(?:wer)?|Key|Correct(?:\s*(?:Option|Answer))?|उत्तर|हल|सही\s*उत्तर)(?:\s*[:=.\-–—]\s*(?:(?:\(([A-Ea-e1-5]|[\u0915-\u0919])\)|\[([A-Ea-e1-5]|[\u0915-\u0919])\]|([A-Ea-e1-5]|[\u0915-\u0919])(?=[\s:.)\]\-–—]|$))\s*(.*)|([^\r\n]+))|\s+(?:(?:\(([A-Ea-e1-5]|[\u0915-\u0919])\)|\[([A-Ea-e1-5]|[\u0915-\u0919])\]|([A-Ea-e1-5]|[\u0915-\u0919])(?=[\s:.)\]\-–—]|$))\s*(.*)))/i
+
+export interface ParsedAnswerMatch {
+  matchedText: string
+  optionLetter?: string
+  extraText?: string
+  rawAnswerText?: string
+}
+
+export function parseAnswerKeyMatch(match: RegExpMatchArray): ParsedAnswerMatch {
+  const matchedText = match[0]
+  const optLetter = match[1] || match[2] || match[3] || match[6] || match[7] || match[8]
+  const extra = (match[4] || match[9] || '').replace(/^[:\-–—.)\]\s]+/, '').trim()
+  const rawAns = (match[5] || '').trim()
+
+  return {
+    matchedText,
+    optionLetter: optLetter ? normalizeOptionLabel(optLetter) : undefined,
+    extraText: extra || undefined,
+    rawAnswerText: rawAns || undefined
+  }
+}
 
 export const EXPLANATION_REGEX = /(?:^|[\s\r\n]+)(?:Explanation|Solution|Exp|व्याख्या|संकेत|Hint)\s*[:=-]\s*(.*)$/i
 
@@ -78,10 +99,10 @@ export const INSTRUCTION_REGEX = /(?:^|[\s\r\n]+)(?:Note|Instruction|निर�
 
 export const COMMENT_REGEX = /(?:^|[\s\r\n]+)(?:Comment|Board|Ref|Citation|टिप्पणी)\s*[:=-]\s*(.*)$/i
 
-export const OPT_REGEX = /(?:^|[\s\r\n]+)(?:[•*·\-–—]\s*|[oO]\s+)?(?:\(([A-Ea-e1-5]|[\u0915-\u0919])\)\s*|\[([A-Ea-e1-5]|[\u0915-\u0919])\]\s*|(?:([A-Ea-e]|[\u0915-\u0919])|([1-5])(?!\.\d))[:.)\]\-]\s*)([\s\S]*?)(?=(?:[\s\r\n]+(?:[•*·\-–—]\s*|[oO]\s+)?(?:\(([A-Ea-e1-5]|[\u0915-\u0919])\)\s*|\[([A-Ea-e1-5]|[\u0915-\u0919])\]\s*|(?:([A-Ea-e]|[\u0915-\u0919])|([1-5])(?!\.\d))[:.)\]\-]\s*))|$)/g
+export const OPT_REGEX = /(?:^|[\s\r\n]+)(?:[•*·\-–—]\s*|[oO]\s+)?(?:\(([A-Ea-e1-5]|[\u0915-\u0919])\)\s*|\[([A-Ea-e1-5]|[\u0915-\u0919])\]\s*|(?:([A-E\u0915-\u0919])[:.)\-]|([a-e1-5])(?!\.\d)[:.)])\s*)([\s\S]*?)(?=(?:[\s\r\n]+(?:[•*·\-–—]\s*|[oO]\s+)?(?:\(([A-Ea-e1-5]|[\u0915-\u0919])\)\s*|\[([A-Ea-e1-5]|[\u0915-\u0919])\]\s*|(?:([A-E\u0915-\u0919])[:.)\-]|([a-e1-5])(?!\.\d)[:.)])\s*))|$)/g
 
 // Matches board citation tags like [BSEB, 2024 (A)], [2023 A], (CBSE 2023, Set-A), [2024 (A)], 2024 (A)
-const BOARD_TERMS = '(?:19\\d\\d|20\\d\\d|B\\.?S\\.?E\\.?B\\.?|C\\.?B\\.?S\\.?E\\.?|I\\.?C\\.?S\\.?E\\.?|N\\.?C\\.?E\\.?R\\.?T\\.?|J\\.?A\\.?C\\.?|UP\\s*Board|MP\\s*Board|Bihar(?:\\s*Board)?|Board|Annual|Compartment(?:al)?|Model\\s*Paper|Set[-\\s]*[A-Za-z0-9]|बिहार(?:\\s*बोर्ड)?|झारखंड(?:\\s*बोर्ड)?|उत्तर\\s*प्रदेश|बोर्ड|वार्षिक)'
+const BOARD_TERMS = '(?:19\\d\\d|20\\d\\d|B\\.?S\\.?E\\.?B\\.?|C\\.?B\\.?S\\.?E\\.?|I\\.?C\\.?S\\.?E\\.?|I\\.?S\\.?C\\.?|N\\.?C\\.?E\\.?R\\.?T\\.?|J\\.?A\\.?C\\.?|U\\.?P\\.?\\s*Board|M\\.?P\\.?\\s*Board|R\\.?B\\.?S\\.?E\\.?|H\\.?B\\.?S\\.?E\\.?|N\\.?I\\.?O\\.?S\\.?|W\\.?B\\.?\\s*Board|Bihar(?:\\s*Board)?|Jharkhand(?:\\s*Board)?|Rajasthan(?:\\s*Board)?|Board(?:\\s*Exam)?|Annual|Compartment(?:al)?|Model\\s*(?:Paper|Set)|Sample\\s*Paper|Set[-\\s]*[A-Za-z0-9]|बिहार(?:\\s*बोर्ड)?|झारखंड(?:\\s*बोर्ड)?|उत्तर\\s*प्रदेश(?:\\s*बोर्ड)?|मध्य\\s*प्रदेश(?:\\s*बोर्ड)?|राजस्थान(?:\\s*बोर्ड)?|बोर्ड(?:\\s*परीक्षा)?|वार्षिक|प्रतिदर्श|मॉडल\\s*पेपर)'
 
 // Safe, non-backtracking regex for board citations:
 export const BOARD_CITATION_REGEX = new RegExp(
@@ -101,9 +122,18 @@ export const BOARD_CITATION_REGEX = new RegExp(
   'gi'
 )
 
+// Multi-character bracketed expressions: matrices, vectors, intervals like [13 15; -1 4], [a b - 1], [-1, 1]
+// Does NOT match single option labels like [A], [B], [1], [क], or [ A ]
+export const MATH_BRACKET_REGEX = /\[(?!\s*[A-Ea-e1-5\u0915-\u0919]\s*\])[^\]\r\n]{2,150}\]/g
+
+// Multi-character parenthesized expressions: tuples like (a, b), (1, 7), (2, 7) or formulas like (sin⁻¹ x + cos⁻¹ x), (-1/2)
+// Does NOT match single option labels like (A), (B), (1), (क), or ( A )
+export const MATH_PAREN_REGEX = /\((?!\s*[A-Ea-e1-5\u0915-\u0919]\s*\))[^()\r\n]{2,150}\)/g
+
 /**
- * Protects board exam citations (e.g. "[BSEB, 2024 (A)]") by replacing them with unique placeholders
- * so that citation set letters like "(A)" are never mistakenly parsed as question options.
+ * Protects board exam citations (e.g. "[BSEB, 2024 (A)]") as well as mathematical matrices
+ * and tuples (e.g. "[2a - 7  1]", "[a  b - 1]", "(a, b)", "(1, 7)") by replacing them with unique placeholders
+ * so that numbers or letters inside matrices/formulas are never mistakenly parsed as question options.
  */
 export function maskCitations(text: string): {
   maskedText: string
@@ -112,20 +142,49 @@ export function maskCitations(text: string): {
 } {
   const map: { placeholder: string; original: string }[] = []
   const citations: string[] = []
-  const maskedText = text.replace(BOARD_CITATION_REGEX, (m) => {
+
+  // 1. Board citations (e.g. [BSEB, 2024 (A)], (CBSE 2023, Set-A), [2023 A], 2024 (A))
+  let maskedText = text.replace(BOARD_CITATION_REGEX, (m) => {
     const placeholder = `__BOARD_CITATION_${map.length}__`
     map.push({ placeholder, original: m })
     citations.push(m)
     return placeholder
   })
+
+  // 2. Multi-character parenthesized expressions: tuples like (a, b), (1, 7) or math formulas
+  maskedText = maskedText.replace(MATH_PAREN_REGEX, (m) => {
+    const placeholder = `__MATH_PAREN_${map.length}__`
+    map.push({ placeholder, original: m })
+    return placeholder
+  })
+
+  // 3. Multi-character bracketed expressions: matrices, vectors, intervals like [13 15; -1 4], [a b - 1], [-1, 1]
+  maskedText = maskedText.replace(MATH_BRACKET_REGEX, (m) => {
+    const placeholder = `__MATH_BRACKET_${map.length}__`
+    map.push({ placeholder, original: m })
+    return placeholder
+  })
+
   const restore = (str: string) => {
     let res = str
-    for (const { placeholder, original } of map) {
+    for (let i = map.length - 1; i >= 0; i--) {
+      const { placeholder, original } = map[i]
       res = res.replaceAll(placeholder, original)
     }
     return res
   }
   return { maskedText, restore, citations }
+}
+
+function getOptionDelimiterStyle(match: RegExpExecArray): string {
+  if (match[1]) return 'paren' // (A)
+  if (match[2]) return 'bracket' // [A]
+  const full = match[0].trim()
+  if (full.endsWith('.')) return 'dot'
+  if (full.endsWith(')')) return 'close_paren'
+  if (full.endsWith(':')) return 'colon'
+  if (full.endsWith('-') || full.endsWith('–') || full.endsWith('—')) return 'dash'
+  return 'other'
 }
 
 /**
@@ -135,28 +194,62 @@ export function maskCitations(text: string): {
 export function findBestOptionMatches(matches: RegExpExecArray[]): RegExpExecArray[] {
   if (matches.length < 2) return []
 
-  // Look from the end backwards for where option 'A' is followed by 'B'
-  for (let i = matches.length - 2; i >= 0; i--) {
-    const rawI = matches[i][1] || matches[i][2] || matches[i][3] || matches[i][4] || ''
-    const rawNext = matches[i + 1][1] || matches[i + 1][2] || matches[i + 1][3] || matches[i + 1][4] || ''
-    const labelI = normalizeOptionLabel(rawI)
-    const labelNext = normalizeOptionLabel(rawNext)
+  let bestSeq: RegExpExecArray[] = []
 
-    if (labelI === 'A' && labelNext === 'B') {
-      const seq = [matches[i]]
-      const expected = ['A', 'B', 'C', 'D', 'E', 'F']
-      let expIdx = 1
-      for (let j = i + 1; j < matches.length; j++) {
-        const rawJ = matches[j][1] || matches[j][2] || matches[j][3] || matches[j][4] || ''
-        const lbl = normalizeOptionLabel(rawJ)
-        if (lbl === expected[expIdx]) {
-          seq.push(matches[j])
-          expIdx++
-        }
+  // Check all positions where an option 'A' begins with delimiter style consistency
+  for (let i = 0; i < matches.length - 1; i++) {
+    const rawI = matches[i][1] || matches[i][2] || matches[i][3] || matches[i][4] || ''
+    const labelI = normalizeOptionLabel(rawI)
+    if (labelI !== 'A') continue
+
+    const styleA = getOptionDelimiterStyle(matches[i])
+    const seq = [matches[i]]
+    const expected = ['A', 'B', 'C', 'D', 'E', 'F']
+    let expIdx = 1
+
+    for (let j = i + 1; j < matches.length; j++) {
+      const rawJ = matches[j][1] || matches[j][2] || matches[j][3] || matches[j][4] || ''
+      const lbl = normalizeOptionLabel(rawJ)
+      const styleJ = getOptionDelimiterStyle(matches[j])
+
+      if (lbl === expected[expIdx] && styleJ === styleA) {
+        seq.push(matches[j])
+        expIdx++
       }
-      if (seq.length >= 2) return seq
+    }
+
+    if (seq.length >= 2 && seq.length > bestSeq.length) {
+      bestSeq = seq
     }
   }
+
+  if (bestSeq.length >= 2) return bestSeq
+
+  // Fallback: check without strict style matching if styles differed slightly
+  for (let i = 0; i < matches.length - 1; i++) {
+    const rawI = matches[i][1] || matches[i][2] || matches[i][3] || matches[i][4] || ''
+    const labelI = normalizeOptionLabel(rawI)
+    if (labelI !== 'A') continue
+
+    const seq = [matches[i]]
+    const expected = ['A', 'B', 'C', 'D', 'E', 'F']
+    let expIdx = 1
+
+    for (let j = i + 1; j < matches.length; j++) {
+      const rawJ = matches[j][1] || matches[j][2] || matches[j][3] || matches[j][4] || ''
+      const lbl = normalizeOptionLabel(rawJ)
+      if (lbl === expected[expIdx]) {
+        seq.push(matches[j])
+        expIdx++
+      }
+    }
+
+    if (seq.length >= 2 && seq.length > bestSeq.length) {
+      bestSeq = seq
+    }
+  }
+
+  if (bestSeq.length >= 2) return bestSeq
 
   // Fallback: check if labels have both A and B
   const labels = matches.map(m => normalizeOptionLabel(m[1] || m[2] || m[3] || m[4] || ''))
@@ -182,7 +275,7 @@ export function containsHorizontalOptions(line: string): boolean {
 export function startsWithOptionA(line: string): boolean {
   const { maskedText } = maskCitations(line)
   const t = maskedText.trim()
-  return /^(?:[•*·\-–—]\s*|[oO]\s+)?(?:\([Aa1\u0915]\)|\[[Aa1\u0915]\]|(?:[Aa\u0915])[:.)\]\-]\s*)/i.test(t)
+  return /^(?:[•*·\-–—]\s*|[oO]\s+)?(?:\([Aa1\u0915]\)|\[[Aa1\u0915]\]|(?:[A\u0915])[:.)\-]\s*|(?:[a])[:.)]\s*)/.test(t)
 }
 
 export function isOptionLine(line: string): boolean {
@@ -194,7 +287,7 @@ export function isOptionLine(line: string): boolean {
   }
   // Letter-based option prefix: A., B., A), a., a), क., क)
   // (Excludes bare numbers 1., 2. which are question numbers)
-  if (/^(?:[•*·\-–—]\s*|[oO]\s+)?(?:[A-Ea-e\u0915-\u0919])[:.)\]\-]\s*/i.test(t)) {
+  if (/^(?:[•*·\-–—]\s*|[oO]\s+)?(?:[A-E\u0915-\u0919][:.)\-]|[a-e][:.)])\s*/.test(t)) {
     return true
   }
   return false
@@ -257,6 +350,7 @@ export function extractQuestionDetails(
   let detectedNumber: string | undefined
   let marks: number | undefined
   let answerKey: string | undefined
+  let rawAnswerText: string | undefined
   let explanation: string | undefined
   let instructions: string | undefined
   let comment: string | undefined
@@ -295,23 +389,37 @@ export function extractQuestionDetails(
       marks = parseInt(mMatch[1], 10)
     }
 
-    // Answer Key check
-    const ansMatch = line.match(ANSWER_KEY_REGEX)
-    if (ansMatch) {
-      const rawAns = (ansMatch[1] || ansMatch[2] || '').trim()
-      const normAns = normalizeOptionLabel(rawAns)
-      if (['A', 'B', 'C', 'D', 'E'].includes(normAns)) {
-        answerKey = normAns
-      } else if (!explanation) {
-        explanation = rawAns
+    // Answer Key check (handles formats like "Ans: A Ram", "उत्तर: (क) भारतेन्दु युग", "Ans: (B) 1", "Ans: सूरदास")
+    // Only treat as standalone meta line if line is not an options line
+    if (!containsHorizontalOptions(line) && !isOptionLine(line)) {
+      const ansMatch = line.match(ANSWER_KEY_REGEX)
+      if (ansMatch) {
+        const parsedAns = parseAnswerKeyMatch(ansMatch)
+        if (parsedAns.optionLetter && ['A', 'B', 'C', 'D', 'E'].includes(parsedAns.optionLetter)) {
+          answerKey = parsedAns.optionLetter
+          if (parsedAns.extraText && !explanation) {
+            explanation = parsedAns.extraText
+          }
+        } else if (parsedAns.rawAnswerText) {
+          const norm = normalizeOptionLabel(parsedAns.rawAnswerText)
+          if (['A', 'B', 'C', 'D', 'E'].includes(norm)) {
+            answerKey = norm
+          } else {
+            rawAnswerText = parsedAns.rawAnswerText
+            if (!explanation) {
+              explanation = parsedAns.rawAnswerText
+            }
+          }
+        }
+        continue
       }
-      continue
     }
 
     // Explanation check
     const expMatch = line.match(EXPLANATION_REGEX)
     if (expMatch) {
-      explanation = expMatch[1].trim()
+      const newExp = expMatch[1].trim()
+      explanation = explanation && explanation !== newExp ? `${explanation} - ${newExp}` : newExp
       continue
     }
 
@@ -356,12 +464,20 @@ export function extractQuestionDetails(
   let maskedParseText = maskedText
   const inlineAns = maskedParseText.match(ANSWER_KEY_REGEX)
   if (inlineAns) {
-    const rawAns = (inlineAns[1] || inlineAns[2] || '').trim()
-    const normAns = normalizeOptionLabel(rawAns)
-    if (['A', 'B', 'C', 'D', 'E'].includes(normAns)) {
-      if (!answerKey) answerKey = normAns
-    } else if (!explanation) {
-      explanation = rawAns
+    const parsedAns = parseAnswerKeyMatch(inlineAns)
+    if (parsedAns.optionLetter && ['A', 'B', 'C', 'D', 'E'].includes(parsedAns.optionLetter)) {
+      if (!answerKey) answerKey = parsedAns.optionLetter
+      if (parsedAns.extraText && !explanation) {
+        explanation = parsedAns.extraText
+      }
+    } else if (parsedAns.rawAnswerText) {
+      const norm = normalizeOptionLabel(parsedAns.rawAnswerText)
+      if (['A', 'B', 'C', 'D', 'E'].includes(norm)) {
+        if (!answerKey) answerKey = norm
+      } else {
+        if (!rawAnswerText) rawAnswerText = parsedAns.rawAnswerText
+        if (!explanation) explanation = parsedAns.rawAnswerText
+      }
     }
     maskedParseText = maskedParseText.replace(inlineAns[0], '').trim()
   }
@@ -392,11 +508,24 @@ export function extractQuestionDetails(
 
       optText = restore(optText)
 
-      // Check if tail of option text has Answer Key: e.g. "(D) प्रतिगामी Ans: A"
+      // Check if tail of option text has Answer Key: e.g. "(D) प्रतिगामी Ans: A Ram"
       const tailAns = optText.match(ANSWER_KEY_REGEX)
       if (tailAns) {
-        if (!answerKey) {
-          answerKey = normalizeOptionLabel(tailAns[1] || tailAns[2] || '')
+        const parsedAns = parseAnswerKeyMatch(tailAns)
+        if (!answerKey && parsedAns.optionLetter) {
+          answerKey = parsedAns.optionLetter
+        }
+        if (parsedAns.extraText && !explanation) {
+          explanation = parsedAns.extraText
+        }
+        if (!answerKey && parsedAns.rawAnswerText) {
+          const norm = normalizeOptionLabel(parsedAns.rawAnswerText)
+          if (['A', 'B', 'C', 'D', 'E'].includes(norm)) {
+            answerKey = norm
+          } else {
+            rawAnswerText = parsedAns.rawAnswerText
+            if (!explanation) explanation = parsedAns.rawAnswerText
+          }
         }
         optText = optText.replace(tailAns[0], '').trim()
       }
@@ -408,6 +537,23 @@ export function extractQuestionDetails(
         isCorrect: false
       }
     })
+
+    // If answerKey was not explicitly given as a letter, but rawAnswerText exists (e.g. "Ans: भारतेन्दु युग" or "Ans: Ram")
+    if (!answerKey && rawAnswerText) {
+      const rLower = rawAnswerText.trim().toLowerCase()
+      const matchedByText = options.find(opt => {
+        const oLower = opt.text.trim().toLowerCase()
+        return (
+          oLower === rLower ||
+          (oLower.length >= 2 && rLower === oLower) ||
+          (oLower.length > 2 && rLower.includes(oLower)) ||
+          (rLower.length > 2 && oLower.includes(rLower))
+        )
+      })
+      if (matchedByText) {
+        answerKey = matchedByText.label
+      }
+    }
 
     // Match answerKey with options
     if (answerKey) {
@@ -426,9 +572,26 @@ export function extractQuestionDetails(
     }
   }
 
+  // Remove board citations from prompt so the prompt remains clean
+  if (citations.length > 0) {
+    for (const c of citations) {
+      prompt = prompt.replace(c, '').trim()
+    }
+    // Clean any trailing connector dashes before citation
+    prompt = prompt.replace(/\s*[-–—]\s*$/, '').trim()
+  }
+
   // Clean prompt: remove trailing marks tags
   prompt = prompt.replace(MARKS_REGEX, '').trim()
-  const cleanPrompt = cleanMathAndStructuredText(prompt || textToParse)
+
+  let fallbackText = textToParse
+  if (citations.length > 0) {
+    for (const c of citations) {
+      fallbackText = fallbackText.replace(c, '').trim()
+    }
+    fallbackText = fallbackText.replace(/\s*[-–—]\s*$/, '').trim()
+  }
+  const cleanPrompt = cleanMathAndStructuredText(prompt || fallbackText)
 
   // Determine question type
   const isMcq = options !== undefined && options.length >= 2

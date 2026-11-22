@@ -459,9 +459,9 @@ Ans: A`
     const parsed = parseBulkQuestions(rawInput)
     expect(parsed.length).toBe(4)
 
-    // Question 1
+    // Question 1: prompt is stripped of citation tag, citation is in comment
     expect(parsed[0].type).toBe('mcq')
-    expect(parsed[0].prompt).toBe('cos⁻¹(-1/2) = [BSEB, 2024 (A)]')
+    expect(parsed[0].prompt).toBe('cos⁻¹(-1/2) =')
     expect(parsed[0].comment).toBe('BSEB, 2024 (A)')
     expect(parsed[0].options?.length).toBe(4)
     expect(parsed[0].options?.[0].label).toBe('A')
@@ -473,9 +473,9 @@ Ans: A`
     expect(parsed[0].options?.[3].label).toBe('D')
     expect(parsed[0].options?.[3].text).toBe('π/2')
 
-    // Question 2: check that interval [-1, 1] is preserved and citation is intact
+    // Question 2: check that interval [-1, 1] is preserved and citation is in comment
     expect(parsed[1].type).toBe('mcq')
-    expect(parsed[1].prompt).toBe('x ∈ [-1, 1], cos⁻¹ x = [BSEB, 2024 (A)]')
+    expect(parsed[1].prompt).toBe('x ∈ [-1, 1], cos⁻¹ x =')
     expect(parsed[1].comment).toBe('BSEB, 2024 (A)')
     expect(parsed[1].options?.length).toBe(4)
     expect(parsed[1].options?.[0].text).toBe('π/2 - cot⁻¹ x')
@@ -483,14 +483,14 @@ Ans: A`
 
     // Question 3
     expect(parsed[2].type).toBe('mcq')
-    expect(parsed[2].prompt).toBe('x ∈ [-1, 1], sin⁻¹(-x) = [BSEB, 2024 (A)]')
+    expect(parsed[2].prompt).toBe('x ∈ [-1, 1], sin⁻¹(-x) =')
     expect(parsed[2].comment).toBe('BSEB, 2024 (A)')
     expect(parsed[2].options?.length).toBe(4)
     expect(parsed[2].options?.[0].text).toBe('-sin⁻¹ x')
 
     // Question 4
     expect(parsed[3].type).toBe('mcq')
-    expect(parsed[3].prompt).toBe('x ≥ 1 या x ≤ -1, cosec⁻¹ x = [BSEB, 2024 (A)]')
+    expect(parsed[3].prompt).toBe('x ≥ 1 या x ≤ -1, cosec⁻¹ x =')
     expect(parsed[3].comment).toBe('BSEB, 2024 (A)')
     expect(parsed[3].options?.length).toBe(4)
     expect(parsed[3].options?.[0].text).toBe('π/2 - sec⁻¹ x')
@@ -510,25 +510,172 @@ Ans: A`
     expect(parsed.length).toBe(3)
 
     expect(parsed[0].type).toBe('mcq')
-    expect(parsed[0].prompt).toContain('(CBSE 2023, Set')
+    expect(parsed[0].prompt).toBe('Which of the following is a unit vector?')
     expect(parsed[0].comment).toContain('CBSE 2023, Set')
     expect(parsed[0].options?.length).toBe(4)
     expect(parsed[0].options?.[0].label).toBe('A')
     expect(parsed[0].options?.[0].text).toBe('i + j')
 
     expect(parsed[1].type).toBe('mcq')
-    expect(parsed[1].prompt).toContain('[2023 A]')
+    expect(parsed[1].prompt).toBe('If matrix A is orthogonal, then |A| is equal to:')
     expect(parsed[1].comment).toBe('2023 A')
     expect(parsed[1].options?.length).toBe(4)
     expect(parsed[1].options?.[0].label).toBe('A')
     expect(parsed[1].options?.[0].text).toBe('±1')
 
     expect(parsed[2].type).toBe('mcq')
-    expect(parsed[2].prompt).toContain('2024 (A)')
+    expect(parsed[2].prompt).toBe('The derivative of eˣ with respect to x is:')
     expect(parsed[2].comment).toBe('2024 (A)')
     expect(parsed[2].options?.length).toBe(4)
     expect(parsed[2].options?.[0].label).toBe('A')
     expect(parsed[2].options?.[0].text).toBe('eˣ')
+  })
+
+  it('parses user specific math question with board citation [BSEB, 2023 (A)] and options cleanly', () => {
+    const rawInput = `x ∈ [-1, 1], sin [2(sin⁻¹ x + cos⁻¹ x)] = [BSEB, 2023 (A)]
+(A) 0   (B) 1   (C) -1   (D) 1/2`
+
+    const parsed = parseBulkQuestions(rawInput)
+    expect(parsed.length).toBe(1)
+    expect(parsed[0].prompt).toBe('x ∈ [-1, 1], sin [2(sin⁻¹ x + cos⁻¹ x)] =')
+    expect(parsed[0].comment).toBe('BSEB, 2023 (A)')
+    expect(parsed[0].options?.length).toBe(4)
+    expect(parsed[0].options?.[0].label).toBe('A')
+    expect(parsed[0].options?.[0].text).toBe('0')
+    expect(parsed[0].options?.[1].label).toBe('B')
+    expect(parsed[0].options?.[1].text).toBe('1')
+    expect(parsed[0].options?.[2].label).toBe('C')
+    expect(parsed[0].options?.[2].text).toBe('-1')
+    expect(parsed[0].options?.[3].label).toBe('D')
+    expect(parsed[0].options?.[3].text).toBe('1/2')
+  })
+
+  it('correctly parses bulk matrix questions with algebraic variables, tuples and matrices like [2a - 7  1] = [a  b - 1] ⇒ (a, b) = [BSEB, 2023 (A)] without splitting questions', () => {
+    const rawInput = `88. [13  15; -1  4] [2  0; 0  2] = [BSEB, 2023 (A)]
+(A) [13  15; -1  4]   (B) [15  0; 0  8]   (C) [26  30; -2  8]   (D) [13  0; 0  8]
+89. [2  3; 5  7] [2; 5] = [BSEB, 2023 (A)]
+(A) [4  6; 25  35]   (B) [4  15; 10  35]   (C) [19  45]   (D) [19; 45]
+90. [2a - 7  1] = [a  b - 1] ⇒ (a, b) = [BSEB, 2023 (A)]
+(A) (1, 7)   (B) (2, 7)   (C) (7, 2)   (D) (2, 3)`
+
+    const parsed = parseBulkQuestions(rawInput)
+    expect(parsed.length).toBe(3)
+
+    // Question 88
+    expect(parsed[0].type).toBe('mcq')
+    expect(parsed[0].prompt).toBe('[13 15; -1 4] [2 0; 0 2] =')
+    expect(parsed[0].comment).toBe('BSEB, 2023 (A)')
+    expect(parsed[0].options?.length).toBe(4)
+    expect(parsed[0].options?.[0].label).toBe('A')
+    expect(parsed[0].options?.[0].text).toBe('[13 15; -1 4]')
+    expect(parsed[0].options?.[1].label).toBe('B')
+    expect(parsed[0].options?.[1].text).toBe('[15 0; 0 8]')
+    expect(parsed[0].options?.[2].label).toBe('C')
+    expect(parsed[0].options?.[2].text).toBe('[26 30; -2 8]')
+    expect(parsed[0].options?.[3].label).toBe('D')
+    expect(parsed[0].options?.[3].text).toBe('[13 0; 0 8]')
+
+    // Question 89
+    expect(parsed[1].type).toBe('mcq')
+    expect(parsed[1].prompt).toBe('[2 3; 5 7] [2; 5] =')
+    expect(parsed[1].comment).toBe('BSEB, 2023 (A)')
+    expect(parsed[1].options?.length).toBe(4)
+    expect(parsed[1].options?.[0].label).toBe('A')
+    expect(parsed[1].options?.[0].text).toBe('[4 6; 25 35]')
+    expect(parsed[1].options?.[1].label).toBe('B')
+    expect(parsed[1].options?.[1].text).toBe('[4 15; 10 35]')
+    expect(parsed[1].options?.[2].label).toBe('C')
+    expect(parsed[1].options?.[2].text).toBe('[19 45]')
+    expect(parsed[1].options?.[3].label).toBe('D')
+    expect(parsed[1].options?.[3].text).toBe('[19; 45]')
+
+    // Question 90 (the crucial one that split previously into #107 and #108)
+    expect(parsed[2].type).toBe('mcq')
+    expect(parsed[2].prompt).toBe('[2a - 7 1] = [a b - 1] ⇒ (a, b) =')
+    expect(parsed[2].comment).toBe('BSEB, 2023 (A)')
+    expect(parsed[2].options?.length).toBe(4)
+    expect(parsed[2].options?.[0].label).toBe('A')
+    expect(parsed[2].options?.[0].text).toBe('(1, 7)')
+    expect(parsed[2].options?.[1].label).toBe('B')
+    expect(parsed[2].options?.[1].text).toBe('(2, 7)')
+    expect(parsed[2].options?.[2].label).toBe('C')
+    expect(parsed[2].options?.[2].text).toBe('(7, 2)')
+    expect(parsed[2].options?.[3].label).toBe('D')
+    expect(parsed[2].options?.[3].text).toBe('(2, 3)')
+  })
+
+  it('leaves comment blank (undefined) when question does not mention any board citation', () => {
+    const rawInput = `1. cosec⁻¹(2) =
+(A) π/6   (B) -π/6   (C) 5π/6   (D) 0`
+
+    const parsed = parseBulkQuestions(rawInput)
+    expect(parsed.length).toBe(1)
+    expect(parsed[0].prompt).toBe('cosec⁻¹(2) =')
+    expect(parsed[0].comment).toBeUndefined()
+  })
+
+  it('parses answer lines with option and text e.g. "Ans: (A) Ram" or "उत्तर: (क) भारतेन्दु युग" and populates solutionText', () => {
+    const rawInput = `1. Who is the author of this poem?
+(A) Ram (B) Shyam (C) Mohan (D) Sohan
+Ans: (A) Ram
+
+2. बालकृष्ण भट्ट किस काल के रचनाकार हैं?
+(क) भारतेन्दु युग (ख) भक्तिकाल (ग) रीतिकाल (घ) आधुनिक काल
+उत्तर: (क) भारतेन्दु युग
+
+3. सूरदास किस भाषा के कवि हैं?
+(A) अवधी (B) ब्रजभाषा (C) मैथिली (D) खड़ी बोली
+उत्तर: ब्रजभाषा`
+
+    const parsed = parseBulkQuestions(rawInput)
+    expect(parsed.length).toBe(3)
+
+    // Question 1
+    expect(parsed[0].answerKey).toBe('A')
+    expect(parsed[0].options?.[0].isCorrect).toBe(true)
+    expect(parsed[0].solutionText).toBe('Ram')
+
+    // Question 2
+    expect(parsed[1].answerKey).toBe('A')
+    expect(parsed[1].options?.[0].isCorrect).toBe(true)
+    expect(parsed[1].solutionText).toBe('भारतेन्दु युग')
+
+    // Question 3: answer by text alone ("उत्तर: ब्रजभाषा") matches option B
+    expect(parsed[2].answerKey).toBe('B')
+    expect(parsed[2].options?.[1].isCorrect).toBe(true)
+    expect(parsed[2].solutionText).toBe('ब्रजभाषा')
+  })
+
+  it('parses inline answer key with explanation at the end of options e.g. "(D) 1/2 Ans: B (1)"', () => {
+    const rawInput = `x ∈ [-1, 1], sin [2(sin⁻¹ x + cos⁻¹ x)] =
+(A) 0   (B) 1   (C) -1   (D) 1/2 Ans: B 1`
+
+    const parsed = parseBulkQuestions(rawInput)
+    expect(parsed.length).toBe(1)
+    expect(parsed[0].answerKey).toBe('B')
+    expect(parsed[0].options?.[1].isCorrect).toBe(true)
+    expect(parsed[0].solutionText).toBe('1')
+    expect(parsed[0].options?.[3].text).toBe('1/2')
+  })
+
+  it('searches question bank by comment tag', async () => {
+    const folder = await bankService.createFolder({ name: 'Search Comment Test Folder' })
+    await bankService.addQuestion({
+      prompt: 'cos⁻¹(-1/2) =',
+      type: 'mcq',
+      marks: 1,
+      difficulty: 'medium',
+      subject: 'Mathematics',
+      className: 'Class 12th',
+      topic: 'Trigonometry',
+      comment: 'BSEB 2024 (A)',
+      folderId: folder.id,
+      tags: ['Math']
+    })
+
+    const results = await bankService.getQuestions({ searchQuery: 'BSEB 2024' })
+    expect(results.length).toBeGreaterThanOrEqual(1)
+    expect(results.some(q => q.comment?.includes('BSEB 2024'))).toBe(true)
   })
 
   it('parses explicit Comment and Board lines and attaches them to the question', () => {

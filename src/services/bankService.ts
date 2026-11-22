@@ -419,6 +419,7 @@ export const bankService = {
         item =>
           item.prompt.toLowerCase().includes(q) ||
           item.topic.toLowerCase().includes(q) ||
+          (item.comment && item.comment.toLowerCase().includes(q)) ||
           item.tags?.some(t => t.toLowerCase().includes(q))
       )
     }

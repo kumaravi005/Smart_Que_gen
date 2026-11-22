@@ -1345,6 +1345,23 @@ Ans: C`)
                             </div>
                           )}
 
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                              Explanation / Solution / Hint (Optional):
+                            </label>
+                            <input
+                              type="text"
+                              value={q.solutionText || ''}
+                              onChange={e => {
+                                const updated = [...bulkParsedItems]
+                                updated[idx] = { ...q, solutionText: e.target.value }
+                                setBulkParsedItems(updated)
+                              }}
+                              placeholder="e.g. Detailed explanation, answer reasoning or hint"
+                              className="w-full px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:bg-white"
+                            />
+                          </div>
+
                           {/* Live preview strip below edit inputs */}
                           <div className="bg-slate-50/80 p-2.5 rounded-xl border border-slate-200/80 space-y-2 mt-2">
                             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
@@ -1428,6 +1445,13 @@ Ans: C`)
                                   )}
                                 </div>
                               ))}
+                            </div>
+                          )}
+
+                          {/* Solution / Explanation / Hint */}
+                          {q.solutionText && (
+                            <div className="text-xs text-amber-950 bg-amber-50/80 border border-amber-200/90 p-2.5 rounded-xl">
+                              <strong className="text-amber-900">Explanation / Solution:</strong> {q.solutionText}
                             </div>
                           )}
                         </div>
