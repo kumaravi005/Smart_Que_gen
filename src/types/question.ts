@@ -42,6 +42,7 @@ export interface Question {
   hint?: string
   solutionText?: string
   explanation?: string // Optional detailed explanation
+  comment?: string // Optional comment / board exam reference info (e.g. "BSEB 2023 Set A")
   answerKey?: string // Optional answer key (e.g. "B" or "74 degrees")
   writingSpaceLines?: number // Optional answer-writing space lines in print output
   customNumber?: string // Optional manual question number override

@@ -6,7 +6,8 @@ import {
   Check,
   Folder,
   ChevronRight,
-  X
+  X,
+  Bookmark
 } from 'lucide-react'
 import { Modal } from '../common/Modal'
 import { Button } from '../common/Button'
@@ -140,6 +141,7 @@ export const QuestionBankModal: React.FC<QuestionBankModalProps> = ({
       hint: item.hint,
       solutionText: item.solutionText,
       explanation: item.solutionText,
+      comment: item.comment,
       diagramUrl: item.diagramUrl, // Crucial: attach photo/diagram to examination question!
       options: item.options?.map(opt => ({
         id: generateId('opt'),
@@ -435,6 +437,12 @@ export const QuestionBankModal: React.FC<QuestionBankModalProps> = ({
                         {item.topic && (
                           <span className="text-[11px] font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100">
                             {item.topic}
+                          </span>
+                        )}
+                        {item.comment && (
+                          <span className="text-[11px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-100 inline-flex items-center gap-1">
+                            <Bookmark className="w-2.5 h-2.5 text-indigo-600" />
+                            {item.comment}
                           </span>
                         )}
                       </div>

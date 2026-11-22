@@ -310,6 +310,12 @@ export function questionToCloud(
   const cloudId = isValidUuid(local.id) ? local.id : deterministicUuid('question', local.id)
   const folderId = local.folderId ? (isValidUuid(local.folderId) ? local.folderId : deterministicUuid('folder', local.folderId)) : null
 
+  // Ensure tags preserve comment if present
+  const tags = Array.isArray(local.tags) ? [...local.tags] : []
+  if (local.comment && !tags.some(t => typeof t === 'string' && t.startsWith('comment:'))) {
+    tags.push(`comment:${local.comment}`)
+  }
+
   return {
     id: cloudId,
     institute_id: instituteId,
@@ -319,7 +325,7 @@ export function questionToCloud(
     subject: local.subject || 'General',
     class_name: local.className || 'General',
     topic: local.topic || 'General',
-    subtopic: local.subtopic || null,
+    subtopic: local.subtopic || (local.comment ? `comment:${local.comment}` : null),
     difficulty: local.difficulty || 'medium',
     marks: local.marks || 1,
     options: local.options || null,
@@ -327,7 +333,7 @@ export function questionToCloud(
     solution_text: local.solutionText || null,
     hint: local.hint || null,
     diagram_path: local.diagramUrl || null,
-    tags: Array.isArray(local.tags) ? local.tags : [],
+    tags,
     usage_count: local.usageCount || 0,
     created_by: userId || null,
     version,
@@ -342,6 +348,21 @@ export function questionToCloud(
  */
 export function questionFromCloud(cloud: Record<string, any>, localId?: string): QuestionBankItem {
   const prompt = cloud.prompt || cloud.question || ''
+
+  let comment = cloud.comment || undefined
+  if (!comment && cloud.subtopic && typeof cloud.subtopic === 'string' && cloud.subtopic.startsWith('comment:')) {
+    comment = cloud.subtopic.slice('comment:'.length)
+  }
+  if (!comment && Array.isArray(cloud.tags)) {
+    const tagComment = cloud.tags.find((t: string) => typeof t === 'string' && t.startsWith('comment:'))
+    if (tagComment) {
+      comment = tagComment.slice('comment:'.length)
+    }
+  }
+
+  const cleanSubtopic = cloud.subtopic && typeof cloud.subtopic === 'string' && cloud.subtopic.startsWith('comment:') ? undefined : cloud.subtopic
+  const cleanTags = Array.isArray(cloud.tags) ? cloud.tags.filter((t: string) => typeof t === 'string' && !t.startsWith('comment:')) : []
+
   const item: QuestionBankItem = {
     id: localId || cloud.id,
     prompt,
@@ -349,15 +370,16 @@ export function questionFromCloud(cloud: Record<string, any>, localId?: string):
     subject: cloud.subject || 'General',
     className: cloud.class_name || 'General',
     topic: cloud.topic || 'General',
-    subtopic: cloud.subtopic || undefined,
+    subtopic: cleanSubtopic || undefined,
     difficulty: cloud.difficulty || 'medium',
     marks: Number(cloud.marks || 1),
     options: cloud.options || undefined,
     matchPairs: cloud.match_pairs || undefined,
     solutionText: cloud.solution_text || undefined,
     hint: cloud.hint || undefined,
+    comment,
     diagramUrl: cloud.diagram_path || undefined,
-    tags: Array.isArray(cloud.tags) ? cloud.tags : [],
+    tags: cleanTags,
     folderId: cloud.folder_id || null,
     usageCount: Number(cloud.usage_count || 0),
     createdAt: cloud.created_at || new Date().toISOString(),

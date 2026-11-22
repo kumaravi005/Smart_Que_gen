@@ -22,6 +22,7 @@ export interface ParsedQuestion {
   options?: ParsedOption[]
   answerKey?: string
   explanation?: string
+  comment?: string
   rawText: string
   warnings: string[]
   isIncluded: boolean
@@ -64,6 +65,7 @@ export function parseBulkQuestionText(
     })),
     answerKey: q.answerKey,
     explanation: q.explanation,
+    comment: q.comment,
     rawText: q.rawText,
     warnings: q.warnings,
     isIncluded: true

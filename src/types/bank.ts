@@ -24,6 +24,7 @@ export interface QuestionBankItem {
   matchPairs?: MatchPair[]
   solutionText?: string
   hint?: string
+  comment?: string // Optional comment / board exam reference info (e.g. "BSEB 2023 Set A")
   diagramUrl?: string // Attached photo / diagram / illustration data URL
   tags: string[]
   folderId?: string | null // ID of parent BankFolder (or null for unfiled)
@@ -52,6 +53,7 @@ export interface BulkParsedQuestion {
   options?: { id: string; label: string; text: string; isCorrect?: boolean }[]
   solutionText?: string
   answerKey?: string
+  comment?: string // Optional comment or detected board exam citation
   rawText: string
   isSelected: boolean
 }

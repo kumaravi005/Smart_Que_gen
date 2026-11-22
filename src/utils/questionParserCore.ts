@@ -19,6 +19,7 @@ export interface CoreParsedQuestion {
   answerKey?: string
   explanation?: string
   instructions?: string
+  comment?: string
   rawText: string
   warnings: string[]
 }
@@ -75,6 +76,8 @@ export const EXPLANATION_REGEX = /(?:^|[\s\r\n]+)(?:Explanation|Solution|Exp|व
 
 export const INSTRUCTION_REGEX = /(?:^|[\s\r\n]+)(?:Note|Instruction|निर्देश|सूचना)\s*[:=-]\s*(.*)$/i
 
+export const COMMENT_REGEX = /(?:^|[\s\r\n]+)(?:Comment|Board|Ref|Citation|टिप्पणी)\s*[:=-]\s*(.*)$/i
+
 export const OPT_REGEX = /(?:^|[\s\r\n]+)(?:[•*·\-–—]\s*|[oO]\s+)?(?:\(([A-Ea-e1-5]|[\u0915-\u0919])\)\s*|\[([A-Ea-e1-5]|[\u0915-\u0919])\]\s*|(?:([A-Ea-e]|[\u0915-\u0919])|([1-5])(?!\.\d))[:.)\]\-]\s*)([\s\S]*?)(?=(?:[\s\r\n]+(?:[•*·\-–—]\s*|[oO]\s+)?(?:\(([A-Ea-e1-5]|[\u0915-\u0919])\)\s*|\[([A-Ea-e1-5]|[\u0915-\u0919])\]\s*|(?:([A-Ea-e]|[\u0915-\u0919])|([1-5])(?!\.\d))[:.)\]\-]\s*))|$)/g
 
 // Matches board citation tags like [BSEB, 2024 (A)], [2023 A], (CBSE 2023, Set-A), [2024 (A)], 2024 (A)
@@ -102,11 +105,17 @@ export const BOARD_CITATION_REGEX = new RegExp(
  * Protects board exam citations (e.g. "[BSEB, 2024 (A)]") by replacing them with unique placeholders
  * so that citation set letters like "(A)" are never mistakenly parsed as question options.
  */
-export function maskCitations(text: string): { maskedText: string; restore: (str: string) => string } {
+export function maskCitations(text: string): {
+  maskedText: string
+  restore: (str: string) => string
+  citations: string[]
+} {
   const map: { placeholder: string; original: string }[] = []
+  const citations: string[] = []
   const maskedText = text.replace(BOARD_CITATION_REGEX, (m) => {
     const placeholder = `__BOARD_CITATION_${map.length}__`
     map.push({ placeholder, original: m })
+    citations.push(m)
     return placeholder
   })
   const restore = (str: string) => {
@@ -116,7 +125,7 @@ export function maskCitations(text: string): { maskedText: string; restore: (str
     }
     return res
   }
-  return { maskedText, restore }
+  return { maskedText, restore, citations }
 }
 
 /**
@@ -222,7 +231,7 @@ export function isExplicitQuestionStart(line: string): boolean {
 
 export function isMetaLine(line: string): boolean {
   const t = line.trim()
-  return ANSWER_KEY_REGEX.test(t) || EXPLANATION_REGEX.test(t) || INSTRUCTION_REGEX.test(t)
+  return ANSWER_KEY_REGEX.test(t) || EXPLANATION_REGEX.test(t) || INSTRUCTION_REGEX.test(t) || COMMENT_REGEX.test(t)
 }
 
 export function isQuestionLike(text: string): boolean {
@@ -250,6 +259,7 @@ export function extractQuestionDetails(
   let answerKey: string | undefined
   let explanation: string | undefined
   let instructions: string | undefined
+  let comment: string | undefined
   const warnings: string[] = []
 
   // Check first line for question prefix
@@ -312,6 +322,13 @@ export function extractQuestionDetails(
       continue
     }
 
+    // Comment / Board check
+    const commentMatch = line.match(COMMENT_REGEX)
+    if (commentMatch) {
+      comment = commentMatch[1].trim()
+      continue
+    }
+
     contentLines.push(rawLine)
   }
 
@@ -321,7 +338,20 @@ export function extractQuestionDetails(
   }
 
   // Check for inline answer key inside textToParse (mask citations first so citations aren't touched)
-  const { maskedText, restore } = maskCitations(textToParse)
+  const { maskedText, restore, citations } = maskCitations(textToParse)
+
+  if (!comment && citations.length > 0) {
+    comment = citations
+      .map(c => {
+        const t = c.trim()
+        if ((t.startsWith('[') && t.endsWith(']')) || (t.startsWith('(') && t.endsWith(')'))) {
+          return t.slice(1, -1).trim()
+        }
+        return t
+      })
+      .filter(Boolean)
+      .join(', ')
+  }
 
   let maskedParseText = maskedText
   const inlineAns = maskedParseText.match(ANSWER_KEY_REGEX)
@@ -429,6 +459,7 @@ export function extractQuestionDetails(
     answerKey,
     explanation: explanation ? cleanMathAndStructuredText(explanation) : undefined,
     instructions: instructions ? cleanMathAndStructuredText(instructions) : undefined,
+    comment: comment ? cleanMathAndStructuredText(comment) : undefined,
     rawText,
     warnings
   }

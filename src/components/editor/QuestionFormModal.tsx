@@ -47,6 +47,7 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
   const [diagramUrl, setDiagramUrl] = useState('')
   const [answerKey, setAnswerKey] = useState('')
   const [explanation, setExplanation] = useState('')
+  const [comment, setComment] = useState('')
   const [writingSpaceLines, setWritingSpaceLines] = useState<number>(0)
   const [customNumber, setCustomNumber] = useState('')
   const [customLayoutMode, setCustomLayoutMode] = useState<'auto' | 'four_per_row' | 'two_per_row' | 'one_per_row'>('auto')
@@ -188,6 +189,7 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
       setDiagramUrl(initialQuestion.diagramUrl || '')
       setAnswerKey(initialQuestion.answerKey || '')
       setExplanation(initialQuestion.explanation || initialQuestion.solutionText || '')
+      setComment(initialQuestion.comment || '')
       setWritingSpaceLines(initialQuestion.writingSpaceLines ?? 0)
       setCustomNumber(initialQuestion.customNumber || '')
       setCustomLayoutMode(initialQuestion.customLayoutMode || 'auto')
@@ -213,6 +215,7 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
       setDiagramUrl('')
       setAnswerKey('')
       setExplanation('')
+      setComment('')
       setWritingSpaceLines(0)
       setCustomNumber('')
       setCustomLayoutMode('auto')
@@ -331,6 +334,7 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
         answerKey: answerKey.trim() || (type === 'mcq' ? options.find(o => o.isCorrect)?.label : undefined),
         explanation: explanation.trim() || undefined,
         solutionText: explanation.trim() || undefined,
+        comment: comment.trim() || undefined,
         writingSpaceLines: (type === 'short_answer' || type === 'long_answer' || type === 'very_short_answer' || type === 'custom')
           ? writingSpaceLines
           : undefined,
@@ -735,6 +739,22 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
             value={explanation}
             onChange={e => setExplanation(e.target.value)}
             placeholder="Step-by-step reasoning or scoring rubric..."
+            className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs sm:text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <label className="block text-xs font-semibold text-slate-700 uppercase">
+              Comment / Board Exam Info / Reference <span className="text-slate-400 font-normal">(Optional)</span>
+            </label>
+            <span className="text-[11px] text-slate-400">e.g. BSEB 2023 (Set A), CBSE 2022, NCERT</span>
+          </div>
+          <input
+            type="text"
+            value={comment}
+            onChange={e => setComment(e.target.value)}
+            placeholder="Board exam year, set, or reference note (e.g. BSEB 2023 Set-A)..."
             className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs sm:text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>

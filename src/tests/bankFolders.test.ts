@@ -462,6 +462,7 @@ Ans: A`
     // Question 1
     expect(parsed[0].type).toBe('mcq')
     expect(parsed[0].prompt).toBe('cos⁻¹(-1/2) = [BSEB, 2024 (A)]')
+    expect(parsed[0].comment).toBe('BSEB, 2024 (A)')
     expect(parsed[0].options?.length).toBe(4)
     expect(parsed[0].options?.[0].label).toBe('A')
     expect(parsed[0].options?.[0].text).toBe('2π/3')
@@ -475,6 +476,7 @@ Ans: A`
     // Question 2: check that interval [-1, 1] is preserved and citation is intact
     expect(parsed[1].type).toBe('mcq')
     expect(parsed[1].prompt).toBe('x ∈ [-1, 1], cos⁻¹ x = [BSEB, 2024 (A)]')
+    expect(parsed[1].comment).toBe('BSEB, 2024 (A)')
     expect(parsed[1].options?.length).toBe(4)
     expect(parsed[1].options?.[0].text).toBe('π/2 - cot⁻¹ x')
     expect(parsed[1].options?.[1].text).toBe('π/2 - sin⁻¹ x')
@@ -482,12 +484,14 @@ Ans: A`
     // Question 3
     expect(parsed[2].type).toBe('mcq')
     expect(parsed[2].prompt).toBe('x ∈ [-1, 1], sin⁻¹(-x) = [BSEB, 2024 (A)]')
+    expect(parsed[2].comment).toBe('BSEB, 2024 (A)')
     expect(parsed[2].options?.length).toBe(4)
     expect(parsed[2].options?.[0].text).toBe('-sin⁻¹ x')
 
     // Question 4
     expect(parsed[3].type).toBe('mcq')
     expect(parsed[3].prompt).toBe('x ≥ 1 या x ≤ -1, cosec⁻¹ x = [BSEB, 2024 (A)]')
+    expect(parsed[3].comment).toBe('BSEB, 2024 (A)')
     expect(parsed[3].options?.length).toBe(4)
     expect(parsed[3].options?.[0].text).toBe('π/2 - sec⁻¹ x')
   })
@@ -507,20 +511,43 @@ Ans: A`
 
     expect(parsed[0].type).toBe('mcq')
     expect(parsed[0].prompt).toContain('(CBSE 2023, Set')
+    expect(parsed[0].comment).toContain('CBSE 2023, Set')
     expect(parsed[0].options?.length).toBe(4)
     expect(parsed[0].options?.[0].label).toBe('A')
     expect(parsed[0].options?.[0].text).toBe('i + j')
 
     expect(parsed[1].type).toBe('mcq')
     expect(parsed[1].prompt).toContain('[2023 A]')
+    expect(parsed[1].comment).toBe('2023 A')
     expect(parsed[1].options?.length).toBe(4)
     expect(parsed[1].options?.[0].label).toBe('A')
     expect(parsed[1].options?.[0].text).toBe('±1')
 
     expect(parsed[2].type).toBe('mcq')
     expect(parsed[2].prompt).toContain('2024 (A)')
+    expect(parsed[2].comment).toBe('2024 (A)')
     expect(parsed[2].options?.length).toBe(4)
     expect(parsed[2].options?.[0].label).toBe('A')
     expect(parsed[2].options?.[0].text).toBe('eˣ')
+  })
+
+  it('parses explicit Comment and Board lines and attaches them to the question', () => {
+    const rawInput = `1. What is the value of cosec⁻¹(2)?
+(A) π/6 (B) -π/6 (C) 5π/6 (D) 0
+Board: BSEB 2023 (Set A)
+Ans: A
+
+2. State whether sin⁻¹ x is defined for all real numbers.
+Comment: Frequently asked in 2022 board exam viva
+Ans: False`
+
+    const parsed = parseBulkQuestions(rawInput)
+    expect(parsed.length).toBe(2)
+
+    expect(parsed[0].type).toBe('mcq')
+    expect(parsed[0].comment).toBe('BSEB 2023 (Set A)')
+    expect(parsed[0].answerKey).toBe('A')
+
+    expect(parsed[1].comment).toBe('Frequently asked in 2022 board exam viva')
   })
 })

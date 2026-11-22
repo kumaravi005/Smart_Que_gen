@@ -14,6 +14,7 @@ export interface BulkParsedQuestion {
   options?: { id: string; label: string; text: string; isCorrect?: boolean }[]
   solutionText?: string
   answerKey?: string
+  comment?: string
   rawText: string
   isSelected: boolean
 }
@@ -59,6 +60,7 @@ export function parseBulkQuestions(
       })),
       solutionText: q.explanation,
       answerKey: q.answerKey,
+      comment: q.comment,
       rawText: q.rawText,
       isSelected: true
     }

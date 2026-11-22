@@ -10,7 +10,8 @@ import {
   HelpCircle,
   ChevronDown,
   ChevronUp,
-  ArrowRightLeft
+  ArrowRightLeft,
+  Bookmark
 } from 'lucide-react'
 import { Badge } from '../common/Badge'
 import { FormattedMathText } from '../common/FormattedMathText'
@@ -88,6 +89,12 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
           {question.topic && (
             <span className="text-[11px] font-medium text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md">
               {question.topic}
+            </span>
+          )}
+          {question.comment && (
+            <span className="text-[11px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-md inline-flex items-center gap-1">
+              <Bookmark className="w-3 h-3 text-indigo-600" />
+              {question.comment}
             </span>
           )}
         </div>
@@ -277,7 +284,7 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
       ) : null}
 
       {/* Collapsible Answer Key & Solution */}
-      {(question.answerKey || question.explanation || question.solutionText) && (
+      {(question.answerKey || question.explanation || question.solutionText || question.comment) && (
         <div className="pt-1 border-t border-slate-100">
           <button
             type="button"
@@ -290,12 +297,20 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
               <ChevronDown className="w-3.5 h-3.5" />
             )}
             <span>
-              {showSolution ? 'Hide Solution & Answer Key' : 'Show Solution & Answer Key'}
+              {showSolution ? 'Hide Solution & Details' : 'Show Solution & Details'}
             </span>
           </button>
 
           {showSolution && (
             <div className="mt-2 p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs space-y-1.5 text-slate-700 animate-in fade-in duration-150">
+              {question.comment && (
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-slate-900">Board / Comment:</span>
+                  <span className="bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200 font-medium text-indigo-700">
+                    {question.comment}
+                  </span>
+                </div>
+              )}
               {question.answerKey && (
                 <div className="flex items-center gap-2">
                   <span className="font-bold text-slate-900">Correct Answer Key:</span>

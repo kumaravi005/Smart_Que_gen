@@ -17,7 +17,8 @@ import {
   X,
   ExternalLink,
   FolderTree,
-  BookOpen
+  BookOpen,
+  Bookmark
 } from 'lucide-react'
 
 import { bankService } from '../services/bankService'
@@ -84,6 +85,7 @@ export const QuestionBankView: React.FC = () => {
   ])
   const [singleDiagramUrl, setSingleDiagramUrl] = useState<string | null>(null)
   const [singleSolution, setSingleSolution] = useState('')
+  const [singleComment, setSingleComment] = useState('')
 
   // Move Modal
   const [isMoveModalOpen, setIsMoveModalOpen] = useState(false)
@@ -220,6 +222,7 @@ export const QuestionBankView: React.FC = () => {
       options: q.options,
       solutionText: q.solutionText,
       hint: q.answerKey ? `Correct Option: ${q.answerKey}` : undefined,
+      comment: q.comment || undefined,
       folderId: currentFolderId,
       tags: [bulkDefaultSubject, bulkDefaultClass, bulkDefaultTopic.trim()].filter(Boolean)
     }))
@@ -249,6 +252,7 @@ export const QuestionBankView: React.FC = () => {
         : undefined,
       diagramUrl: singleDiagramUrl || undefined,
       solutionText: singleSolution.trim() ? cleanMathAndStructuredText(singleSolution.trim()) : undefined,
+      comment: singleComment.trim() || undefined,
       folderId: currentFolderId,
       tags: [singleSubject, singleClass, singleTopic.trim()].filter(Boolean)
     }
@@ -272,6 +276,7 @@ export const QuestionBankView: React.FC = () => {
     setSingleType('mcq')
     setSingleDiagramUrl(null)
     setSingleSolution('')
+    setSingleComment('')
     setSingleOptions([
       { id: '1', label: 'A', text: '', isCorrect: true },
       { id: '2', label: 'B', text: '', isCorrect: false },
@@ -292,6 +297,7 @@ export const QuestionBankView: React.FC = () => {
     setSingleType(q.type)
     setSingleDiagramUrl(q.diagramUrl || null)
     setSingleSolution(q.solutionText || '')
+    setSingleComment(q.comment || '')
     if (q.options && q.options.length > 0) {
       setSingleOptions(q.options)
     } else {
@@ -825,6 +831,12 @@ export const QuestionBankView: React.FC = () => {
                             Topic: {item.topic}
                           </span>
                         )}
+                        {item.comment && (
+                          <span className="inline-flex items-center gap-1 text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-200/80 px-2 py-0.5 rounded-md">
+                            <Bookmark className="w-3 h-3 text-indigo-600" />
+                            {item.comment}
+                          </span>
+                        )}
                       </div>
 
                       {/* Prompt */}
@@ -878,6 +890,17 @@ export const QuestionBankView: React.FC = () => {
                               )}
                             </div>
                           ))}
+                        </div>
+                      )}
+
+                      {/* Comment / Board Exam Info / Notes */}
+                      {item.comment && (
+                        <div className="text-xs text-indigo-950 bg-indigo-50/70 border border-indigo-200/80 p-2.5 rounded-xl flex items-start gap-2">
+                          <Bookmark className="w-3.5 h-3.5 text-indigo-600 mt-0.5 shrink-0" />
+                          <div className="leading-relaxed">
+                            <strong className="text-indigo-900 font-semibold">Board / Comment:</strong>{' '}
+                            <span className="text-indigo-800 font-medium">{item.comment}</span>
+                          </div>
                         </div>
                       )}
 
@@ -1255,6 +1278,23 @@ Ans: C`)
                             />
                           </div>
 
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                              Board Exam / Comment:
+                            </label>
+                            <input
+                              type="text"
+                              value={q.comment || ''}
+                              onChange={e => {
+                                const updated = [...bulkParsedItems]
+                                updated[idx] = { ...q, comment: e.target.value }
+                                setBulkParsedItems(updated)
+                              }}
+                              placeholder="e.g. BSEB 2023 (Set A), CBSE 2022"
+                              className="w-full px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:bg-white"
+                            />
+                          </div>
+
                           {q.type === 'mcq' && q.options && (
                             <div className="space-y-1.5">
                               <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">
@@ -1329,9 +1369,17 @@ Ans: C`)
                         /* ACTUAL QUESTION PAPER FORMAT */
                         <div className="space-y-3 pt-0.5">
                           {/* Question Prompt with Math & Devanagari Typography */}
-                          <div className="text-sm font-semibold text-slate-900 leading-relaxed">
-                            <span className="mr-1.5 text-slate-700">{idx + 1}.</span>
-                            <FormattedMathText text={q.prompt} />
+                          <div className="text-sm font-semibold text-slate-900 leading-relaxed flex items-start justify-between gap-2">
+                            <div>
+                              <span className="mr-1.5 text-slate-700">{idx + 1}.</span>
+                              <FormattedMathText text={q.prompt} />
+                            </div>
+                            {q.comment && (
+                              <span className="shrink-0 text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-md inline-flex items-center gap-1">
+                                <Bookmark className="w-2.5 h-2.5 text-indigo-600" />
+                                {q.comment}
+                              </span>
+                            )}
                           </div>
 
                           {/* MCQ Options formatted like real textbook exam paper */}
@@ -1607,6 +1655,23 @@ Ans: C`)
               onChange={e => setSingleSolution(e.target.value)}
               placeholder="Explanation or step-by-step solution..."
               className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-300 rounded-xl"
+            />
+          </div>
+
+          {/* Comment / Board Exam Info / Notes */}
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-xs font-bold text-slate-700 uppercase">
+                Comment / Board Exam Info / Notes (Optional)
+              </label>
+              <span className="text-[11px] text-slate-400">e.g. BSEB 2023 (Set A), CBSE 2022, NCERT</span>
+            </div>
+            <textarea
+              rows={2}
+              value={singleComment}
+              onChange={e => setSingleComment(e.target.value)}
+              placeholder="Write board exam year, question set, or special reference note (e.g. BSEB 2023 Set-A)..."
+              className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
             />
           </div>
 
