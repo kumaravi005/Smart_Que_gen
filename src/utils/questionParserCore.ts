@@ -130,9 +130,12 @@ export const MATH_BRACKET_REGEX = /\[(?!\s*[A-Ea-e1-5\u0915-\u0919]\s*\])[^\]\r\
 // Does NOT match single option labels like (A), (B), (1), (क), or ( A )
 export const MATH_PAREN_REGEX = /\((?!\s*[A-Ea-e1-5\u0915-\u0919]\s*\))[^()\r\n]{2,150}\)/g
 
+// Determinant expressions: | x+1 x+2 x+a | or | a b ; c d |
+export const MATH_DETERMINANT_REGEX = /\|(?!\s*\|)[^|\r\n]{2,200}\|/g
+
 /**
- * Protects board exam citations (e.g. "[BSEB, 2024 (A)]") as well as mathematical matrices
- * and tuples (e.g. "[2a - 7  1]", "[a  b - 1]", "(a, b)", "(1, 7)") by replacing them with unique placeholders
+ * Protects board exam citations (e.g. "[BSEB, 2024 (A)]") as well as mathematical matrices,
+ * determinants, and tuples (e.g. "[2a - 7  1]", "| x+1 x+2 x+a |", "(a, b)") by replacing them with unique placeholders
  * so that numbers or letters inside matrices/formulas are never mistakenly parsed as question options.
  */
 export function maskCitations(text: string): {
@@ -151,14 +154,21 @@ export function maskCitations(text: string): {
     return placeholder
   })
 
-  // 2. Multi-character parenthesized expressions: tuples like (a, b), (1, 7) or math formulas
+  // 2. Determinant expressions: | x+1 x+2 x+a | or | a b ; c d |
+  maskedText = maskedText.replace(MATH_DETERMINANT_REGEX, (m) => {
+    const placeholder = `__MATH_DET_${map.length}__`
+    map.push({ placeholder, original: m })
+    return placeholder
+  })
+
+  // 3. Multi-character parenthesized expressions: tuples like (a, b), (1, 7) or math formulas
   maskedText = maskedText.replace(MATH_PAREN_REGEX, (m) => {
     const placeholder = `__MATH_PAREN_${map.length}__`
     map.push({ placeholder, original: m })
     return placeholder
   })
 
-  // 3. Multi-character bracketed expressions: matrices, vectors, intervals like [13 15; -1 4], [a b - 1], [-1, 1]
+  // 4. Multi-character bracketed expressions: matrices, vectors, intervals like [13 15; -1 4], [a b - 1], [-1, 1]
   maskedText = maskedText.replace(MATH_BRACKET_REGEX, (m) => {
     const placeholder = `__MATH_BRACKET_${map.length}__`
     map.push({ placeholder, original: m })

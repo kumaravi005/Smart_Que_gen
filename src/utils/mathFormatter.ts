@@ -71,6 +71,162 @@ function toSubscript(str: string): string {
 }
 
 /**
+ * Resolves LaTeX matrix environments into standardized determinant / matrix strings:
+ * \begin{vmatrix} ... \end{vmatrix} -> | r1 ; r2 ; r3 |
+ * \begin{bmatrix} ... \end{bmatrix} -> [ r1 ; r2 ; r3 ]
+ */
+function resolveLatexMatrices(text: string): string {
+  return text.replace(
+    /\\begin\{(vmatrix|Vmatrix|bmatrix|pmatrix|matrix)\}([\s\S]*?)\\end\{\1\}/g,
+    (_match, env, inner) => {
+      const isDet = env === 'vmatrix' || env === 'Vmatrix'
+      const rows = inner
+        .split(/\\\\|\\cr/)
+        .map((r: string) => r.trim())
+        .filter(Boolean)
+        .map((r: string) => {
+          return r.split('&').map((c: string) => c.trim()).join(' & ')
+        })
+      const joined = rows.join(' ; ')
+      return isDet ? `| ${joined} |` : `[ ${joined} ]`
+    }
+  )
+}
+
+/**
+ * Normalizes multi-row determinants (| r1 | | r2 | or | r1 |\n| r2 |) into | r1 ; r2 |.
+ */
+function resolveMultiRowDeterminants(text: string): string {
+  return text.replace(
+    /\|\s*([^|\r\n;]+?)\s*\|\s*(?:[\r\n\s]*\|\s*([^|\r\n;]+?)\s*\|)+/g,
+    (match) => {
+      const rows = Array.from(match.matchAll(/\|\s*([^|\r\n]+?)\s*\|/g)).map(m => m[1].trim())
+      if (rows.length >= 2 && rows.every(r => r.length > 0)) {
+        const formattedRows = rows.map(r => {
+          if (/\s{2,}|\t/.test(r)) {
+            return r.split(/\s{2,}|\t/).map(c => c.trim()).join(' & ')
+          }
+          return r
+        })
+        return `| ${formattedRows.join(' ; ')} |`
+      }
+      return match
+    }
+  )
+}
+
+/**
+ * Normalizes multi-row matrices ([ r1 ] [ r2 ] or [ r1 ]\n[ r2 ]) into [ r1 ; r2 ].
+ */
+function resolveMultiRowMatrices(text: string): string {
+  return text.replace(
+    /\[\s*([^\]\r\n;]+?)\s*\]\s*(?:[\r\n\s]*\[\s*([^\]\r\n;]+?)\s*\])+/g,
+    (match) => {
+      if (/bseb|cbse|ncert|\b\d{4}\b/i.test(match)) return match
+      const rows = Array.from(match.matchAll(/\[\s*([^\]\r\n]+?)\s*\]/g)).map(m => m[1].trim())
+      if (rows.length >= 2 && rows.every(r => r.length > 0 && !/^[A-Ea-e1-5]$/.test(r))) {
+        const formattedRows = rows.map(r => {
+          if (/\s{2,}|\t/.test(r)) {
+            return r.split(/\s{2,}|\t/).map(c => c.trim()).join(' & ')
+          }
+          return r
+        })
+        return `[ ${formattedRows.join(' ; ')} ]`
+      }
+      return match
+    }
+  )
+}
+
+/**
+ * Normalizes definite integrals into ∫_{lower}^{upper}.
+ * Handles LaTeX \int_{-1}^1, \int_{-1}^{1}, \int_a^b, Unicode ∫₍₋₁₎¹, ∫₋₁¹, etc.
+ */
+function normalizeIntegrals(text: string): string {
+  // 1. LaTeX with curly braces: \int_{-1}^{1} or \int^{1}_{-1}
+  text = text.replace(
+    /\\int\s*_\s*\{([^{}]+)\}\s*\^\s*\{([^{}]+)\}/g,
+    '∫_{$1}^{$2}'
+  )
+  text = text.replace(
+    /\\int\s*\^\s*\{([^{}]+)\}\s*_\s*\{([^{}]+)\}/g,
+    '∫_{$2}^{$1}'
+  )
+
+  // 2. LaTeX single char/token limits: \int_{-1}^1, \int_a^b, \int_0^\pi
+  text = text.replace(
+    /\\int\s*_\s*(\([^)]+\)|[a-zA-Z0-9\-\+\\]+)\s*\^\s*(\([^)]+\)|[a-zA-Z0-9\-\+\\]+)/g,
+    (_m, low, up) => {
+      const cleanLow = low.replace(/^\((.*)\)$/, '$1').replace(/^\\/, '')
+      const cleanUp = up.replace(/^\((.*)\)$/, '$1').replace(/^\\/, '')
+      return `∫_{${cleanLow}}^{${cleanUp}}`
+    }
+  )
+  text = text.replace(
+    /\\int\s*\^\s*(\([^)]+\)|[a-zA-Z0-9\-\+\\]+)\s*_\s*(\([^)]+\)|[a-zA-Z0-9\-\+\\]+)/g,
+    (_m, up, low) => {
+      const cleanLow = low.replace(/^\((.*)\)$/, '$1').replace(/^\\/, '')
+      const cleanUp = up.replace(/^\((.*)\)$/, '$1').replace(/^\\/, '')
+      return `∫_{${cleanLow}}^{${cleanUp}}`
+    }
+  )
+
+  // 3. Already converted Unicode subscripts & superscripts: e.g. ∫₍₋₁₎¹ or ∫₋₁¹
+  text = text.replace(
+    /∫\s*(?:₍([^₎]+)₎|([₀₁₂₃₄₅₆₇₈₉₋₊aeoxnijk]+))\s*(?:⁽([^⁾]+)⁾|\^\{([^{}]+)\}|\^([a-zA-Z0-9\-\+]+)|([¹²³⁴⁵⁶⁷⁸⁹⁰⁺⁻n]+))/g,
+    (_m, sub1, sub2, sup1, sup2, sup3, sup4) => {
+      const rawSub = sub1 || sub2 || ''
+      const rawSup = sup1 || sup2 || sup3 || sup4 || ''
+      const normalSub = rawSub
+        .split('')
+        .map((ch: string) => SUBSCRIPT_MAP[ch] || ch)
+        .join('')
+        .replace(/^\((.*)\)$/, '$1')
+      const normalSup = rawSup
+        .split('')
+        .map((ch: string) => SUPERSCRIPT_MAP[ch] || ch)
+        .join('')
+        .replace(/^\((.*)\)$/, '$1')
+      return `∫_{${normalSub}}^{${normalSup}}`
+    }
+  )
+
+  // 4. Standalone \int -> ∫
+  text = text.replace(/\\int(?![a-zA-Z])/g, '∫')
+  return text
+}
+
+/**
+ * Normalizes limits into lim_{target}.
+ * Handles \lim_{x \to 0}, \lim_{x->0}, lim_(x->0), lim₍ₓ→₀₎.
+ */
+function normalizeLimits(text: string): string {
+  return text.replace(
+    /(?:\\lim|lim)\s*(?:_\{([^{}]+)\}|_\(([^)]+)\)|₍([^₎]+)₎)/gi,
+    (_m, g1, g2, g3) => {
+      let target = (g1 || g2 || g3 || '').trim()
+      target = target.replace(/\\(?:rightarrow|to)|->/g, '→')
+      return `lim_{${target}}`
+    }
+  )
+}
+
+/**
+ * Normalizes summations and products into ∑_{lower}^{upper} and ∏_{lower}^{upper}.
+ */
+function normalizeSummations(text: string): string {
+  text = text.replace(
+    /(?:\\sum|∑)\s*(?:_\{([^{}]+)\}|_([a-zA-Z0-9\-\+=]+))\s*(?:\^\{([^{}]+)\}|\^([a-zA-Z0-9\-\+]+))/g,
+    (_m, l1, l2, u1, u2) => `∑_{${l1 || l2}}^{${u1 || u2}}`
+  )
+  text = text.replace(
+    /(?:\\prod|∏)\s*(?:_\{([^{}]+)\}|_([a-zA-Z0-9\-\+=]+))\s*(?:\^\{([^{}]+)\}|\^([a-zA-Z0-9\-\+]+))/g,
+    (_m, l1, l2, u1, u2) => `∏_{${l1 || l2}}^{${u1 || u2}}`
+  )
+  return text
+}
+
+/**
  * Extracts balanced curly braces content starting at a specific index '{'.
  */
 function extractBalancedBraces(str: string, startIndex: number): { content: string; endIndex: number } | null {
@@ -253,6 +409,27 @@ export function cleanMathAndStructuredText(input: string): string {
   text = text.replace(/\\left\./g, '')
   text = text.replace(/\\right\./g, '')
 
+  // 3b. Resolve LaTeX matrices and multi-row determinants/matrices
+  text = resolveLatexMatrices(text)
+  text = resolveMultiRowDeterminants(text)
+  text = resolveMultiRowMatrices(text)
+
+  // 3c. Normalize Integrals, Limits & Summations
+  text = normalizeIntegrals(text)
+  text = normalizeLimits(text)
+  text = normalizeSummations(text)
+
+  // Protect structured integrals, limits, and summations with safe alphanumeric tokens without underscores
+  const protectedTokens: { placeholder: string; original: string }[] = []
+  text = text.replace(
+    /∫_\{[^{}]+\}\^\{[^{}]+\}|lim_\{[^{}]+\}|(?:∑|∏)_\{[^{}]+\}\^\{[^{}]+\}/g,
+    (match) => {
+      const placeholder = `ZXMATHPROT${protectedTokens.length}END`
+      protectedTokens.push({ placeholder, original: match })
+      return placeholder
+    }
+  )
+
   // 4. Geometry and Similarity Symbols (e.g. \triangle ABC \sim \triangle PQR -> △ABC ~ △PQR)
   text = text.replace(/\\(?:triangle|bigtriangleup)(?![a-zA-Z])\s*/g, '△')
   text = text.replace(/\\sim(?![a-zA-Z])/g, '~')
@@ -264,6 +441,11 @@ export function cleanMathAndStructuredText(input: string): string {
   text = text.replace(/\\square(?![a-zA-Z])\s*/g, '□')
   text = text.replace(/\\odot(?![a-zA-Z])\s*/g, '⊙')
 
+  // Vectors and accents
+  text = text.replace(/\\vec\s*\{([a-zA-Z0-9]+)\}|\\vec\s*([a-zA-Z])/g, '$1$2⃗')
+  text = text.replace(/\\hat\s*\{([ijk])\}|\\hat\s*([ijk])/g, '$1$2̂')
+  text = text.replace(/\\overrightarrow\s*\{([^{}]+)\}/g, '$1⃗')
+
   // Degrees: ^\circ, ^{\circ}, \degree
   text = text.replace(/\^\s*\{\s*\\circ\s*\}/g, '°')
   text = text.replace(/\^\s*\\circ(?![a-zA-Z])/g, '°')
@@ -272,10 +454,10 @@ export function cleanMathAndStructuredText(input: string): string {
 
   // 5. Trigonometric and standard function prefixes
   // Matches \sin29 -> sin 29, \cos61 -> cos 61, \tan45 -> tan 45
-  text = text.replace(/\\(sin|cos|tan|cot|sec|csc|cosec|log|ln|lim|exp|max|min)(?![a-zA-Z])\s*([0-9]+)/gi, '$1 $2')
-  text = text.replace(/\\(sin|cos|tan|cot|sec|csc|cosec|log|ln|lim|exp|max|min)(?![a-zA-Z])/gi, '$1')
+  text = text.replace(/\\(sin|cos|tan|cot|sec|csc|cosec|log|ln|exp|max|min)(?![a-zA-Z])\s*([0-9]+)/gi, '$1 $2')
+  text = text.replace(/\\(sin|cos|tan|cot|sec|csc|cosec|log|ln|exp|max|min)(?![a-zA-Z])/gi, '$1')
   // Clean if already without backslash but squished to digits: e.g. "sin29°" -> "sin 29°", "cos61°" -> "cos 61°"
-  text = text.replace(/\b(sin|cos|tan|cot|sec|csc|cosec|log|ln|lim|exp|max|min)\s*([0-9]+)/gi, '$1 $2')
+  text = text.replace(/\b(sin|cos|tan|cot|sec|csc|cosec|log|ln|exp|max|min)\s*([0-9]+)/gi, '$1 $2')
 
   // 6. Fractions & Roots (balanced braces)
   text = resolveFractions(text)
@@ -301,6 +483,19 @@ export function cleanMathAndStructuredText(input: string): string {
 
   // Single char subscripts: e.g. x_1 -> x₁, x_2 -> x₂
   text = text.replace(/_([0-9+\-=()aeoxnijk])/g, (_m, ch) => SUBSCRIPT_MAP[ch] || `_${ch}`)
+
+  // Restore protected structured integrals and limits
+  for (let i = protectedTokens.length - 1; i >= 0; i--) {
+    const { placeholder, original } = protectedTokens[i]
+    text = text.replaceAll(placeholder, original)
+  }
+
+  // Collapse spaces between variable/function/bracket and superscript
+  // e.g. "x ¹⁷" -> "x¹⁷", "cos ⁴ x" -> "cos⁴ x", "sin ² x" -> "sin² x", "tan ⁻¹" -> "tan⁻¹", "cosec ⁻¹" -> "cosec⁻¹"
+  text = text.replace(/([a-zA-Z0-9\u0900-\u097F\)])\s+([⁰¹²³⁴⁵⁶⁷⁸⁹ⁿ⁺⁻]+)/g, '$1$2')
+  // Collapse spaces around ^ and _: "x ^ 17" -> "x^17"
+  text = text.replace(/([a-zA-Z0-9\)])\s*\^\s*([0-9a-zA-Z+\-]+|\{[^{}]+\})/g, '$1^$2')
+  text = text.replace(/([a-zA-Z0-9\)])\s*_\s*([0-9a-zA-Z+\-]+|\{[^{}]+\})/g, '$1_$2')
 
   // 8. Arithmetic & Comparison Operators
   text = text.replace(/\\times(?![a-zA-Z])/g, '×')
